@@ -548,7 +548,7 @@ type_to_integrand = function(type, gg){
       travelled_mellomregn = function(ss, uu, param) function_travelled_mellomregn(tt = 0, ss = ss, uu = uu, rr = 0, vv = 0, param)
       passedBy_mellomregn = function(ss, uu, param) function_passedBy_mellomregn(tt = 0, ss = ss, uu = uu, rr = 0, vv = 0, param)
       possible_mellomregn = function(tt, ss, uu, param) sapply(1:length(all_surv_functions_possible),
-                                                               function(i) match.fun(all_surv_functions_possible[i])(param = param, tt - ss - uu))
+                                                               function(i) match.fun(all_surv_functions_possible[i])(param = param, tt - uu))
       function_final = function(xx, tt, param) {
         ss = xx[1]
         uu = xx[2]
@@ -567,7 +567,7 @@ type_to_integrand = function(type, gg){
       travelled_mellomregn = function(ss, uu, rr, param) function_travelled_mellomregn(tt = 0, ss, uu, rr, vv = 0, param)
       passedBy_mellomregn = function(ss, uu, rr, param) function_travelled_mellomregn(tt = 0, ss, uu, rr, vv = 0, param)
       possible_mellomregn = function(tt, ss, uu, rr, param) sapply(1:length(all_surv_functions_possible),
-                                                                   function(i) match.fun(all_surv_functions_possible[i])(param = param, tt - ss - uu - rr))
+                                                                   function(i) match.fun(all_surv_functions_possible[i])(param = param, tt - rr))
       function_final = function(xx, tt, param) {
         ss = xx[1]
         uu = xx[2]
@@ -589,7 +589,7 @@ type_to_integrand = function(type, gg){
       travelled_mellomregn = function(ss, uu, rr, vv, param) function_travelled_mellomregn(tt = 0, ss, uu, rr, vv, param)
       passedBy_mellomregn = function(ss, uu, rr, vv, param) function_travelled_mellomregn(tt = 0, ss, uu, rr, vv, param)
       possible_mellomregn = function(tt, ss, uu, rr, vv, param) sapply(1:length(all_surv_functions_possible),
-                                                                       function(i) match.fun(all_surv_functions_possible[i])(param = param, tt - ss - uu - rr))
+                                                                       function(i) match.fun(all_surv_functions_possible[i])(param = param, tt - vv))
       function_final = function(xx, tt, param) {
         ss = xx[1]
         uu = xx[2]
