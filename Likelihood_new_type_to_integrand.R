@@ -763,9 +763,32 @@ finding_limits_integral = function(i, type, data_set, gg){
   return(all_limits)
 }
 
+## Finding all types, integrand, time points ++
+formula_obs_types = all_types(gg)
+all_data_set = arrange_data(data_set = dd, gg)
+observation_type = rep(NA, nrow(all_data_set))
+all_integral_limits = list()
+integrand = list()
+all_types = list()
+for(i in 1:nrow(all_data_set)){
+  observation_type[i] = all_data_set[i,"obs_type"]
+  type = names(which(formula_obs_types[, observation_type[i]] == 1))
+  integrand_mellomregn = list()
+  integral_mellomregn= list()
+  type_1 = list()
+  for(j in 1:length(type)){
+    integrand_mellomregn[[j]] = type_to_integrand_absExact(type[j], edge_mats, densities, survival_functions, edge_abs)
+    integral_mellomregn[[j]] = finding_limits_integral(i, type[j], data_set = dd, gg)
+    type_1[[j]] = type[j]
+  }
+  all_integral_limits[[i]] = integral_mellomregn
+  integrand[[i]] = integrand_mellomregn
+  all_types[[i]] = type_1
+}
+
 ## Make additional input for cubintegrate
-from_time_point_to_integral = function(param, method1 = "hcubature", integrand, all_data_set, 
-                                       all_integral_limits, mc_cores = 5){
+from_time_point_to_integral = function(param, method1 = "hcubature", integrand = integrand, all_data_set = all_data_set, 
+                                       all_integral_limits = all_integral_limits, mc_cores = 5){
   ## Including all types and the data set
   final_integral = sum(unlist(mclapply(1:nrow(all_data_set), function(i){
     ## Using the observation type to find all possible formula types
@@ -820,31 +843,10 @@ from_time_point_to_integral = function(param, method1 = "hcubature", integrand, 
   return(final_integral)
 }
 
-## Finding all types, integrand, time points ++
-formula_obs_types = all_types(gg)
-all_data_set = arrange_data(data_set = dd, gg)
-observation_type = rep(NA, nrow(all_data_set))
-all_integral_limits = list()
-integrand = list()
-all_types = list()
-for(i in 1:nrow(all_data_set)){
-  observation_type[i] = all_data_set[i,"obs_type"]
-  type = names(which(formula_obs_types[, observation_type[i]] == 1))
-  integrand_mellomregn = list()
-  integral_mellomregn= list()
-  type_1 = list()
-  for(j in 1:length(type)){
-    integrand_mellomregn[[j]] = type_to_integrand_absExact(type[j], edge_mats, densities, survival_functions, edge_abs)
-    integral_mellomregn[[j]] = finding_limits_integral(i, type[j], data_set = dd, gg)
-    type_1[[j]] = type[j]
-  }
-  all_integral_limits[[i]] = integral_mellomregn
-  integrand[[i]] = integrand_mellomregn
-  all_types[[i]] = type_1
-}
 
 ## Optimization
 optim(rep(1,5), from_time_point_to_integral, method1 = "hcubature", integrand = integrand, all_data_set = all_data_set, 
       all_integral_limits = all_integral_limits, mc_cores = 5, method = "L-BFGS-B", lower = c(0.00001,0.00001,0.00001,0.00001,0.00001),
             control = list(fnscale = -1))
+
 
