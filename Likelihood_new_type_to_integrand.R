@@ -203,8 +203,7 @@ all_types(gg)
 
 ## 2.6 Arrange data
 ## Input: data_set (the dataset to consider), gg (the graph)
-## Make code which splits in wheter the absorbing state is observed exact or not. 
-arrange_data = function(data_set, gg){
+arrange_data = function(data_set, gg, abs_int_cens = NULL){
   ## Finding the initial, transient and absorbing states - in the "new" format with 0, 1, ...
   all_edges = get.edgelist(gg)
   all_initial = which(!(all_edges[,1] %in% all_edges[,2]))
@@ -218,6 +217,7 @@ arrange_data = function(data_set, gg){
   row_initial = sapply(1:length(initial_state), function(p) which(all_states_old == initial_state[p], arr.ind = TRUE))
   row_absorbing = sapply(1:length(absorbing_state), function(p) which(all_states_old == absorbing_state[p], arr.ind = TRUE))
   
+  
   transient_state_new = c()  
   for(p in 1:length(all_states_old)){
     if(!(all_states_old[p] %in% absorbing_state) & !(all_states_old[p] %in% initial_state)){
@@ -227,19 +227,35 @@ arrange_data = function(data_set, gg){
   initial_state_new = sapply(row_initial, function(p) state_ordering(gg)[p,2])
   absorbing_state_new = sapply(row_absorbing, function(p) state_ordering(gg)[p,2])
   
+  
+  if(!is.null(abs_int_cens)){
+    row_absorbing = sapply(1:length(absorbing_state), function(p) which(all_states_old == absorbing_state[p], arr.ind = TRUE))
+    absorbing_state_int_cens = sapply(row_absorbing, function(p) state_ordering(gg)[p,2])
+    absorbing_state_r_cens = which(!(absorbing_state_new %in% absorbing_state_int_cens))
+  }
+  
+  
   ## Back to the timepoints - making an empty matrix with correct time points
   ddr = relevant_timepoints(data_set, gg)
   inds = unique(ddr$PTNUM)
   nn = length(inds)
+  if(is.null(abs_int_cens)){
   timepoints = matrix(NA,nn,length(initial_state) + length(absorbing_state) + 2*length(transient_state_new) +1)
   names_middle = paste(rep("t", length(initial_state) + 2*length(transient_state_new) + length(absorbing_state)),
                        c(initial_state_new, rep(transient_state_new,each = 2), absorbing_state_new), 
                        rep(c("M", "m"), 
                            (length(initial_state) + 2*length(transient_state_new) + length(absorbing_state))/2), sep="")
   
-  
+  } else{
+    timepoints = matrix(NA,nn,length(initial_state) + length(absorbing_state)- length(abs_int_cens) + 2*length(transient_state_new)+2*length(abs_int_cens) +1)
+    names_middle = paste(rep("t", length(initial_state) + 2*length(transient_state_new) + 2*length(abs_int_cens) + length(absorbing_state_new)-length(abs_int_cens)),
+                         c(initial_state_new, rep(transient_state_new,each = 2), rep(abs_int_cens, each = 2), absorbing_state_r_cens), 
+                         rep(c("M", "m"), 
+                             (length(initial_state) + 2*length(transient_state_new) + 2*length(absorbing_state_int_cens) + length(absorbing_state_r_cens))/2), sep="")
+  }
   colnames(timepoints) = c(names_middle, "obs_type")
   
+  if(is.null(abs_int_cens)){
   ## Filling out the timepoints matrix
   otypes = rep(NA,nn) # a vector indicating the observation type of each patient
   for (i in 1:nn){
@@ -263,6 +279,32 @@ arrange_data = function(data_set, gg){
     ## Which observed type the individual is
     timepoints[i, ncol(timepoints)] = paste(unique(names(tti[!(is.na(tti))])), collapse ="")
   }
+  } else{
+    ## Filling out the timepoints matrix
+    otypes = rep(NA,nn) # a vector indicating the observation type of each patient
+    for (i in 1:nn){
+      ddi = ddr[which(ddr$PTNUM==inds[i]),]
+      tti = ddi$years[pmatch(c(initial_state_new, rep(transient_state_new, each = 2),
+                               rep(absorbing_state_int_cens, each = 2), absorbing_state_r_cens),ddi$state)]
+      names(tti) = as.character(c(initial_state_new, rep(transient_state_new, each = 2),
+                                  rep(absorbing_state_int_cens, each = 2), absorbing_state_r_cens),ddi$state)
+      
+      for(j in 2:length(tti)){
+        ## If the initial state(s) column number is odd/even, then all the "M"'s are also odd/even.
+        ## It is the "M"'s which potentially are NA. Do not want to fill them if both are NA
+        if((length(initial_state) %% 2) == (j %% 2) & j > length(initial_state) & 
+           j <= (length(initial_state) + 2*length(transient_state_new) + 2*length(absorbing_state_int_cens))){
+          if (is.na(tti[j]) & !is.na(tti[j-1])){
+            tti[j] = tti[j-1]
+          }
+        }
+      }
+      timepoints[i,1:(ncol(timepoints)-1)] = tti
+      ## Which observed type the individual is
+      timepoints[i, ncol(timepoints)] = paste(unique(names(tti[!(is.na(tti))])), collapse ="")
+    }
+  }
+  
   return(timepoints) 
 }
 arrange_data(dd, gg)
@@ -679,18 +721,19 @@ type_to_integrand_absExact = function(type,edge_mats,densfunc,survfunc,edge_abs)
 
 ## Part 3: From the time points of a given patient to an integral
 
-finding_limits_integral = function(i, type, data_set, gg){
+all_edges = get.edgelist(gg)
+all_absorbing = which(!(all_edges[,2] %in% all_edges[,1]))
+absorbing_state = unique(sapply(all_absorbing, function(p) all_edges[p,2]))
+all_states_old = state_ordering(gg)[,1]
+row_absorbing = sapply(1:length(absorbing_state), function(p) which(all_states_old == absorbing_state[p], arr.ind = TRUE))
+absorbing_state_new = sapply(row_absorbing, function(p) state_ordering(gg)[p,2])
+all_data_set = arrange_data(data_set = dd, gg)
+
+finding_limits_integral = function(i, type, gg, all_edges, absorbing_state_new, all_data_set){
   ## Finding the absorbing state(s) 
   ## Possibly make a separate function to find the initial, transient and absorbing states 
-  all_edges = get.edgelist(gg)
-  all_absorbing = which(!(all_edges[,2] %in% all_edges[,1]))
-  absorbing_state = unique(sapply(all_absorbing, function(p) all_edges[p,2]))
-  all_states_old = state_ordering(gg)[,1]
-  row_absorbing = sapply(1:length(absorbing_state), function(p) which(all_states_old == absorbing_state[p], arr.ind = TRUE))
-  absorbing_state_new = sapply(row_absorbing, function(p) state_ordering(gg)[p,2])
   
   ## Arranging the data set and extracting the row. 
-  all_data_set = arrange_data(data_set, gg)
   time_points = all_data_set[i,1:(ncol(all_data_set)-1)]
   ## All the types
   all_time_points = substr(names(time_points), 2,2)
@@ -778,7 +821,7 @@ for(i in 1:nrow(all_data_set)){
   type_1 = list()
   for(j in 1:length(type)){
     integrand_mellomregn[[j]] = type_to_integrand_absExact(type[j], edge_mats, densities, survival_functions, edge_abs)
-    integral_mellomregn[[j]] = finding_limits_integral(i, type[j], data_set = dd, gg)
+    integral_mellomregn[[j]] = finding_limits_integral(i, type[j], gg, all_edges, absorbing_state_new, all_data_set)
     type_1[[j]] = type[j]
   }
   all_integral_limits[[i]] = integral_mellomregn
