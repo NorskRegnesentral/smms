@@ -448,17 +448,31 @@ travelled = edge_matrices(gg)$traveled
 density_function(gg, "012", travelled)
 
 
-S_01 = function(param, t){1-pexp(t,param[1])}
-S_12 = function(param, t){1-pexp(t,param[2])}
-S_23 = function(param, t){1-pexp(t,param[3])}
-S_03 = function(param, t){1-pexp(t,param[4])}
-S_13 = function(param, t){1-pexp(t,param[5])}
+# S_01 = function(param, t){1-pexp(t,param[1])}
+# S_12 = function(param, t){1-pexp(t,param[2])}
+# S_23 = function(param, t){1-pexp(t,param[3])}
+# S_03 = function(param, t){1-pexp(t,param[4])}
+# S_13 = function(param, t){1-pexp(t,param[5])}
+# 
+# f_01 = function(param, t){dexp(t,param[1])}
+# f_12 = function(param, t){dexp(t,param[2])}
+# f_23 = function(param, t){dexp(t,param[3])}
+# f_03 = function(param, t){dexp(t,param[4])}
+# f_13 = function(param, t){dexp(t,param[5])}
 
-f_01 = function(param, t){dexp(t,param[1])}
-f_12 = function(param, t){dexp(t,param[2])}
-f_23 = function(param, t){dexp(t,param[3])}
-f_03 = function(param, t){dexp(t,param[4])}
-f_13 = function(param, t){dexp(t,param[5])}
+S_01 = function(param, t){(as.numeric(t>=0))* (1-pweibull(t,param[1],param[2]))}
+S_12 = function(param, t){(as.numeric(t>=0))* (1-pweibull(t,param[3],param[4]))}
+S_23 = function(param, t){(as.numeric(t>=0))* (1-pweibull(t,param[5],param[6]))}
+S_03 = function(param, t){(as.numeric(t>=0))* (1-pweibull(t,param[7],param[8]))}
+S_13 = function(param, t){(as.numeric(t>=0))* (1-pweibull(t,param[9],param[10]))}
+
+f_01 = function(param, t){as.numeric(t>=0)*dweibull(t,param[1],param[2])}
+f_12 = function(param, t){as.numeric(t>=0)*dweibull(t,param[3],param[4])}
+f_23 = function(param, t){as.numeric(t>=0)*dweibull(t,param[5],param[6])}
+f_03 = function(param, t){as.numeric(t>=0)*dweibull(t,param[7],param[8])}
+f_13 = function(param, t){as.numeric(t>=0)*dweibull(t,param[9],param[10])}
+
+
 
 densities <- c(f_01,f_03,f_12,f_13,f_23)
 names(densities) <- c("01","03","12","13","23")
@@ -831,7 +845,7 @@ for(i in 1:nrow(all_data_set)){
 
 ## Make additional input for cubintegrate
 from_time_point_to_integral = function(param, method1 = "hcubature", integrand = integrand, all_data_set = all_data_set, 
-                                       all_integral_limits = all_integral_limits, mc_cores = 5){
+                                       all_integral_limits = all_integral_limits, mc_cores = 2){
   ## Including all types and the data set
   final_integral = sum(unlist(mclapply(1:nrow(all_data_set), function(i){
     ## Using the observation type to find all possible formula types
@@ -888,8 +902,9 @@ from_time_point_to_integral = function(param, method1 = "hcubature", integrand =
 
 
 ## Optimization
-optim(rep(1,5), from_time_point_to_integral, method1 = "hcubature", integrand = integrand, all_data_set = all_data_set, 
-      all_integral_limits = all_integral_limits, mc_cores = 5, method = "L-BFGS-B", lower = c(0.00001,0.00001,0.00001,0.00001,0.00001),
+system.time({
+optim(rep(1,10), from_time_point_to_integral, method1 = "hcubature", integrand = integrand, all_data_set = all_data_set, 
+      all_integral_limits = all_integral_limits, mc_cores = 5, method = "L-BFGS-B", lower = rep(0.00001,10),
             control = list(fnscale = -1))
-
+})
 
