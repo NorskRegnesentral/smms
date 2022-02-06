@@ -1,5 +1,5 @@
 #### CAV example for testing
-
+setwd("H:/Multistate models/SemiMarkovMultistate")
 rm(list = ls())
 library(igraph)
 library(parallel)
@@ -64,30 +64,39 @@ all_data_set = arrange_data(data_set = dd, gg)
 observation_type = rep(NA, nrow(all_data_set))
 all_integral_limits = list()
 integrand = list()
+integrand2 = list()
 all_types = list()
 for(i in 1:nrow(all_data_set)){
   observation_type[i] = all_data_set[i,"obs_type"]
   type = names(which(formula_obs_types[, observation_type[i]] == 1))
   integrand_mellomregn = list()
+  integrand_mellomregn2 = list()
   integral_mellomregn= list()
   type_1 = list()
   for(j in 1:length(type)){
     integrand_mellomregn[[j]] = eval(parse(text=type_to_integrand_absExact(type[j], edge_mats, edge_abs)))
+    integrand_mellomregn2[[j]] = eval(parse(text=type_to_integrand_absExact_v2(type[j], edge_mats, edge_abs)))
     integral_mellomregn[[j]] = finding_limits_integral(i, type[j], gg, all_edges, absorbing_state_new, all_data_set)
     type_1[[j]] = type[j]
   }
   all_integral_limits[[i]] = integral_mellomregn
   integrand[[i]] = integrand_mellomregn
+  integrand2[[i]] = integrand_mellomregn2
   all_types[[i]] = type_1
 }
 
 params <- c(1.43,8.72,1.21,3.05,1.12,3.75,0.44,418.32,0.71,6.78)
 
-from_time_point_to_integral(params,method1 = "hcubature", integrand = integrand, all_data_set = all_data_set, 
+from_time_point_to_integral(params,method1 = "hcubature", integrand = integrand,integrand2 = integrand2, 
                             all_integral_limits = all_integral_limits,mc_cores=1)
 
+system.time({
+  from_time_point_to_integral(params,method1 = "hcubature", integrand = integrand,integrand2 = integrand2,
+                              all_integral_limits = all_integral_limits,mc_cores=1)
+})
 
 system.time({
-  from_time_point_to_integral(params,method1 = "hcubature", integrand = integrand, all_data_set = all_data_set, 
-                              all_integral_limits = all_integral_limits,mc_cores=5)
+  oo <- nlminb(params,from_time_point_to_integral,integrand = integrand,integrand2 = integrand2, 
+              all_integral_limits = all_integral_limits,mc_cores=1,lower=rep(0.0001,10))
 })
+

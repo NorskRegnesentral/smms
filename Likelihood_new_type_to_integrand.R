@@ -900,7 +900,8 @@ from_time_point_to_integral = function(param, method1 = "hcubature", integrand =
   return(final_integral)
 }
 
-
+from_time_point_to_integral(rep(1,10),method1 = "hcubature", integrand = integrand, all_data_set = all_data_set, 
+                            all_integral_limits = all_integral_limits)
 ## Optimization
 system.time({
 optim(rep(1,10), from_time_point_to_integral, method1 = "hcubature", integrand = integrand, all_data_set = all_data_set, 
