@@ -80,7 +80,7 @@ type_to_integrand_absExact = function(type,edge_mats,edge_abs){
   
   # Write variable calls
   dim_integral <- max(travi)
-  #if (names(travi)[which.max(travi)] %in% edge_abs) dim_integral <- dim_integral-1
+  if (names(travi)[which.max(travi)] %in% edge_abs) dim_integral <- dim_integral-1
   variable_names <- c("ss","uu","rr","vv")
   var_def <- rep(NA,dim_integral)
   for (i in 1:dim_integral){
@@ -88,13 +88,14 @@ type_to_integrand_absExact = function(type,edge_mats,edge_abs){
   }
   
   # If the absorbing state is reached (and we know exactly when): change the last one
-  if (names(travi)[which.max(travi)] %in% edge_abs){
-    var_def[dim_integral+1] <- paste(variable_names[dim_integral],"<-","tt","\n",sep="")
-  }
+  # if (names(travi)[which.max(travi)] %in% edge_abs){
+  #   var_def[dim_integral+1] <- paste(variable_names[dim_integral],"<-","tt","\n",sep="")
+  # }
   
   # Write "travelled" functions
   variable_names_eval <- c("ss","uu-ss","rr-uu","vv-rr")
   n_trav <- sum(travi>0)
+  if (names(travi)[which.max(travi)] %in% edge_abs)  variable_names_eval[n_trav] <- sub("^.{2}", "tt", variable_names_eval[n_trav])
   f_trav <- rep(NA,n_trav)
   if (n_trav>0){
     for (i in 1:n_trav){
@@ -154,6 +155,97 @@ type_to_integrand_absExact = function(type,edge_mats,edge_abs){
   f_end <- "}"
   f_prod <- paste(paste(f_trav,collapse=""),paste(S_passed,collapse=""),paste(S_posi,collapse=""))
   ff <- paste(f_intro,paste(var_def,collapse=""),f_prod,f_end)
+  
+  return(ff)
+}
+
+
+
+# with univariate inputs
+type_to_integrand_absExact_v2 = function(type,edge_mats,edge_abs){
+  # inputs: type, edge_mats, (names of density functions, survival functions,) vector of edges into absorbing state
+  # output: an integrand function written as a string per type
+  
+  travi <- edge_mats$traveled[type,]
+  passi <- edge_mats$passedBy[type,]
+  posi <- edge_mats$possible[type,]
+  
+  density_names <- c("f_01","f_03","f_12","f_13","f_23") #make as input, should be sorted in the same way as columns in edge mats
+  surv_names <- c("S_01","S_03","S_12","S_13","S_23") #should be sorted in the same way as columns in edge mats
+  
+  # Write variable calls
+  dim_integral <- max(travi)
+  if (names(travi)[which.max(travi)] %in% edge_abs) dim_integral <- dim_integral-1
+  variable_names <- c("ss","uu","rr","vv")
+  var_def <- rep(NA,dim_integral)
+  for (i in 1:dim_integral){
+    var_def[i] <- paste(variable_names[i],",")
+  }
+  
+  
+  # Write "travelled" functions
+  variable_names_eval <- c("ss","uu","rr","vv")
+  n_trav <- sum(travi>0)
+  if (names(travi)[which.max(travi)] %in% edge_abs){
+    variable_names_eval[n_trav] <-  paste("tt-", paste0(variable_names_eval[1:(n_trav-1)],collapse="",sep="- "))
+    variable_names_eval[n_trav] <- gsub('.{2}$', '', variable_names_eval[n_trav]) 
+  }
+  f_trav <- rep(NA,n_trav)
+  if (n_trav>0){
+    for (i in 1:n_trav){
+      f_trav[i] <- paste(density_names[which(travi==i)],"(param,",variable_names_eval[i],")","*")
+    }
+  }
+  
+  
+  # Write "passedBy" functions
+  n_passed <- sum(passi>0)
+  S_passed <- rep(NA,n_passed)
+  ii <- 1
+  if (n_passed>0){
+    for (i in 1:max(passi)){
+      n_pass_i <- sum(passi==i)
+      if (n_pass_i==0) next
+      for (j in 1:n_pass_i){
+        S_passed[ii] <- paste(surv_names[which(passi==i)][j],"(param,",variable_names_eval[i],")","*")
+        ii <- ii+1
+      }
+    }
+  }
+  
+  # Write "possible" functions
+  variable_names_eval_pos <- c("tt","tt-ss","tt-uu-ss","tt-rr-uu-ss")
+  n_posi <- sum(posi>0)
+  S_posi <- rep(NA,n_posi)
+  if (n_posi>0){
+    ii <- 1
+    eval <- variable_names_eval_pos[dim_integral+1]
+    
+    for (i in 1:max(posi)){
+      n_posi_i <- sum(posi==i)
+      if (n_posi_i==0) next
+      for (j in 1:n_posi_i){
+        S_posi[ii] <- paste(surv_names[which(posi==i)][j],"(param,",eval,")","*")
+        ii <- ii+1
+      }
+    }
+    
+  }
+  
+  # remove the last "*" in the last function
+  if (length(S_passed)==0 & length(S_posi)==0){
+    f_trav[n_trav] <- gsub('.{1}$', '', f_trav[n_trav]) 
+  }else if (length(S_posi)==0){
+    S_passed[n_passed] <- gsub('.{1}$', '', S_passed[n_passed])
+  }else if (length(S_posi)!=0){
+    S_posi[n_posi] <- gsub('.{1}$', '', S_posi[n_posi]) 
+  }
+  
+  # paste everything together
+  f_intro <- paste("function(",paste(var_def,collapse=""),"tt,param){")
+  f_end <- "}"
+  f_prod <- paste(paste(f_trav,collapse=""),paste(S_passed,collapse=""),paste(S_posi,collapse=""))
+  ff <- paste(f_intro,f_prod,f_end)
   
   return(ff)
 }
@@ -238,59 +330,64 @@ finding_limits_integral = function(i, type, gg, all_edges, absorbing_state_new, 
 
 
 ## Make additional input for cubintegrate
-from_time_point_to_integral = function(param, method1 = "hcubature", integrand = integrand, all_data_set = all_data_set, 
+from_time_point_to_integral = function(param, method1 = "hcubature", integrand = integrand,integrand2 = integrand2, 
                                        all_integral_limits = all_integral_limits, mc_cores = 2){
   ## Including all types and the data set
-  final_integral = sum(unlist(mclapply(1:nrow(all_data_set), function(i){
+  final_integral = sum(unlist(mclapply(1:length(integrand), function(i){
     ## Using the observation type to find all possible formula types
-    ## If we only have one type for this observation type
-    if(length(all_integral_limits[[i]]) == 1){
-      lower_integral_mellomregn = c(as.numeric(all_integral_limits[[i]][[1]][1]), as.numeric(all_integral_limits[[i]][[1]][3]),
-                                    as.numeric(all_integral_limits[[i]][[1]][5]), as.numeric(all_integral_limits[[i]][[1]][7]))
+    calculate_integral_multiple_types = rep(NA, length(all_integral_limits[[i]]))
+    for(j in 1:length(all_integral_limits[[i]])){
+      lower_integral_mellomregn = as.numeric(all_integral_limits[[i]][[j]][c(1,3,5,7)])
       lower_integral = lower_integral_mellomregn[!is.na(lower_integral_mellomregn)]
-      upper_integral_mellomregn = c(as.numeric(all_integral_limits[[i]][[1]][2]), as.numeric(all_integral_limits[[i]][[1]][4]),
-                                    as.numeric(all_integral_limits[[i]][[1]][6]), as.numeric(all_integral_limits[[i]][[1]][8]))
+      upper_integral_mellomregn =  as.numeric(all_integral_limits[[i]][[j]][c(2,4,6,8)])
       upper_integral = upper_integral_mellomregn[!is.na(upper_integral_mellomregn)]
-      tmax = as.numeric(all_integral_limits[[i]][[1]][9])
+      tmax = as.numeric(all_integral_limits[[i]][[j]][9])
       
       length_lower_integral = length(lower_integral)
       length_unique_lower_integral = length(unique(lower_integral))
+      #print(i)
       
       if(length_lower_integral == 0){
-        log(integrand[[i]][[1]](xx=NULL,tt = tmax, param = param))
-      } else if(length_unique_lower_integral != length_lower_integral){
-        log(cubintegrate(integrand[[i]][[1]], lower = lower_integral, upper = upper_integral, method = "vegas",tt = tmax, param = param, maxEval = 10^3)$integral)
-      } else if(length_unique_lower_integral == length_lower_integral){
-        log(cubintegrate(integrand[[i]][[1]], lower = lower_integral, upper = upper_integral, method = method1, tt = tmax, param = param)$integral)
-      }
-    } else{ #if(length(all_integral_limits[[i]]) > 1){ ## If we have more than one type for this observation type
-      calculate_integral_multiple_types = rep(NA, length(all_integral_limits[[i]]))
-      for(j in 1:length(all_integral_limits[[i]])){
-        lower_integral_mellomregn = c(as.numeric(all_integral_limits[[i]][[j]][1]), as.numeric(all_integral_limits[[i]][[j]][3]), 
-                                      as.numeric(all_integral_limits[[i]][[j]][5]), as.numeric(all_integral_limits[[i]][[j]][7]))
-        lower_integral = lower_integral_mellomregn[!is.na(lower_integral_mellomregn)]
-        upper_integral_mellomregn = c(as.numeric(all_integral_limits[[i]][[j]][2]), as.numeric(all_integral_limits[[i]][[j]][4]),
-                                      as.numeric(all_integral_limits[[i]][[j]][6]), as.numeric(all_integral_limits[[i]][[j]][8]))
-        upper_integral = upper_integral_mellomregn[!is.na(upper_integral_mellomregn)]
-        tmax = as.numeric(all_integral_limits[[i]][[j]][9])
-        
-        length_lower_integral = length(lower_integral)
-        length_unique_lower_integral = length(unique(lower_integral))
-        
-        if(length_lower_integral == 0){
-          calculate_integral_multiple_types[j] = integrand[[i]][[j]](xx=NULL,tt = tmax, param = param) # the value of xx does not matter
-        } else if(length_unique_lower_integral != length_lower_integral){
-          calculate_integral_multiple_types[j] = cubintegrate(integrand[[i]][[j]], lower = lower_integral, upper = upper_integral, method = "vegas", maxEval = 1000,
-                                                              tt = tmax, param = param)$integral
-          # needs to check that it does not matter that the dimension of xx is higher then lower and upper
-        } else if(length_unique_lower_integral == length_lower_integral){
-          calculate_integral_multiple_types[j] = cubintegrate(integrand[[i]][[j]], lower = lower_integral, upper = upper_integral, 
-                                                              method = method1, tt = tmax, param = param)$integral
-        } 
-      }
-      ## Taking the log of the sum of the likelihood contribution for each possible type
-      log(sum(calculate_integral_multiple_types))
+        calculate_integral_multiple_types[j] = integrand[[i]][[j]](xx=1,tt = tmax, param = param) # the value of xx does not matter
+      }else if(length_lower_integral>0){
+        if(length_lower_integral<=2 ){
+          calculate_integral_multiple_types[j] = repintegrate(integrand2[[i]][[j]],tt=tmax,lower=lower_integral,upper = upper_integral, param = param)
+        }else if (length_lower_integral>2){
+          if (length_unique_lower_integral != length_lower_integral){
+            calculate_integral_multiple_types[j] = cubintegrate(integrand[[i]][[j]], lower = lower_integral, upper = upper_integral, method = "divonne", maxEval = 500,
+                                                                tt = tmax, param = param)$integral
+          }else if (length_unique_lower_integral == length_lower_integral){
+            calculate_integral_multiple_types[j] = cubintegrate(integrand[[i]][[j]], lower = lower_integral, upper = upper_integral,maxEval = 500,
+                                                                method = method1, tt = tmax, param = param)$integral
+          }
+        }
+      } 
     }
+    ## Taking the log of the sum of the likelihood contribution for each possible type
+    -log(sum(calculate_integral_multiple_types))
   }, mc.cores = mc_cores)))
   return(final_integral)
 }
+
+
+##
+# Integrals over functions of 2 variables
+repint2 <- function(ss,innerfunc,tt,param,lower2,upper2){ #integrate over uu
+  mm <- length(ss)
+  out <- rep(NA,mm)
+  for (i in 1:mm){
+    out[i] <- integrate(innerfunc,lower=max(lower2-ss[i],0),upper=upper2-ss[i],tt=tt,
+                        ss=ss[i],param=param)$value
+  }
+  return(out)
+} 
+# Integral over functions of 1 variable
+repintegrate <- function(innerfunc,tt,param,lower,upper){ #integrate over ss
+  if (length(lower)==1){
+    out <- integrate(innerfunc,lower=lower,upper=upper,tt=tt,param=param)$value
+  }else{
+    out <- integrate(repint2,innerfunc=innerfunc,lower=max(lower[1],0),upper=upper[1],tt=tt,param=param,
+                     lower2=lower[2],upper2=upper[2])$value
+  }
+  return(out)
+} 
