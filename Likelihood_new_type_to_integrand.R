@@ -843,11 +843,14 @@ for(i in 1:nrow(all_data_set)){
   all_types[[i]] = type_1
 }
 
+length_all_data = nrow(all_data_set)
+
 ## Make additional input for cubintegrate
-from_time_point_to_integral = function(param, method1 = "hcubature", integrand = integrand, all_data_set = all_data_set, 
+from_time_point_to_integral = function(param, method1 = "hcubature", integrand = integrand, length_all_data = length_all_data,
                                        all_integral_limits = all_integral_limits, mc_cores = 2){
+  print(param)
   ## Including all types and the data set
-  final_integral = sum(unlist(mclapply(1:nrow(all_data_set), function(i){
+  final_integral = sum(unlist(mclapply(1:length_all_data, function(i){
     ## Using the observation type to find all possible formula types
     ## If we only have one type for this observation type
     if(length(all_integral_limits[[i]]) == 1){
@@ -865,9 +868,11 @@ from_time_point_to_integral = function(param, method1 = "hcubature", integrand =
       if(length_lower_integral == 0){
         log(integrand[[i]][[1]](tt = tmax, param = param))
       } else if(length_unique_lower_integral != length_lower_integral){
-        log(cubintegrate(integrand[[i]][[1]], lower = lower_integral, upper = upper_integral, method = "vegas",tt = tmax, param = param, maxEval = 10^3)$integral)
+        log(cubintegrate(integrand[[i]][[1]], lower = lower_integral, upper = upper_integral, relTol = .Machine$double.eps^0.25,
+                         absTol = .Machine$double.eps^0.25, method = "vegas",tt = tmax, param = param, maxEval = 10^3)[[1]])
       } else if(length_unique_lower_integral == length_lower_integral){
-        log(cubintegrate(integrand[[i]][[1]], lower = lower_integral, upper = upper_integral, method = method1, tt = tmax, param = param)$integral)
+        log(cubintegrate(integrand[[i]][[1]], lower = lower_integral, upper = upper_integral, relTol = .Machine$double.eps^0.25,
+                         absTol = .Machine$double.eps^0.25, method = method1, norm = "LINF",tt = tmax, param = param)[[1]])
       }
     } else{ #if(length(all_integral_limits[[i]]) > 1){ ## If we have more than one type for this observation type
       calculate_integral_multiple_types = rep(NA, length(all_integral_limits[[i]]))
@@ -887,16 +892,19 @@ from_time_point_to_integral = function(param, method1 = "hcubature", integrand =
           calculate_integral_multiple_types[j] = integrand[[i]][[j]](tt = tmax, param = param)
         } else if(length_unique_lower_integral != length_lower_integral){
           calculate_integral_multiple_types[j] = cubintegrate(integrand[[i]][[j]], lower = lower_integral, upper = upper_integral, method = "vegas", maxEval = 1000,
-                                                              tt = tmax, param = param)$integral
+                                                              relTol = .Machine$double.eps^0.25,
+                                                              absTol = .Machine$double.eps^0.25, tt = tmax, param = param)[[1]]
         } else if(length_unique_lower_integral == length_lower_integral){
           calculate_integral_multiple_types[j] = cubintegrate(integrand[[i]][[j]], lower = lower_integral, upper = upper_integral, 
-                                                              method = method1, tt = tmax, param = param)$integral
+                                                              relTol = .Machine$double.eps^0.25,
+                                                              absTol = .Machine$double.eps^0.25, norm = "LINF", 
+                                                              method = method1, tt = tmax, param = param)[[1]]
         } 
       }
       ## Taking the log of the sum of the likelihood contribution for each possible type
       log(sum(calculate_integral_multiple_types))
     }
-  }, mc.cores = mc_cores)))
+  }, mc.cores = mc_cores), use.names = FALSE))
   return(final_integral)
 }
 
@@ -904,8 +912,230 @@ from_time_point_to_integral(rep(1,10),method1 = "hcubature", integrand = integra
                             all_integral_limits = all_integral_limits)
 ## Optimization
 system.time({
-optim(rep(1,10), from_time_point_to_integral, method1 = "hcubature", integrand = integrand, all_data_set = all_data_set, 
-      all_integral_limits = all_integral_limits, mc_cores = 5, method = "L-BFGS-B", lower = rep(0.00001,10),
+  s = optim(rep(1,10), fn = from_time_point_to_integral,
+            method1 = "hcubature", integrand = integrand, length_all_data = length_all_data, 
+            all_integral_limits = all_integral_limits, mc_cores = 16, method = "L-BFGS-B", lower = rep(0.001,10),
             control = list(fnscale = -1))
 })
+
+# user    system   elapsed 
+# 77070.953  5282.505  7352.932 
+# > s
+# $par
+# [1]   1.4008302   9.6487108   1.0264029   2.4950103   0.7528340   2.4159848
+# [7]   0.5454484 101.5835126   6.8958849   6.2633280
+# 
+# $value
+# [1] -1407.982
+# 
+# $counts
+# function gradient 
+# 117      117 
+# 
+# $convergence
+# [1] 1
+# 
+# $message
+# [1] "NEW_X"
+
+
+
+## Make an example where optim for the "exact" values - assume 
+arrange_data_exact = function(data_set, gg, abs_int_cens = NULL){
+  ## Finding the initial, transient and absorbing states - in the "new" format with 0, 1, ...
+  all_edges = get.edgelist(gg)
+  all_initial = which(!(all_edges[,1] %in% all_edges[,2]))
+  initial_state = unique(sapply(all_initial, function(p) all_edges[p,1]))
+  all_absorbing = which(!(all_edges[,2] %in% all_edges[,1]))
+  absorbing_state = unique(sapply(all_absorbing, function(p) all_edges[p,2]))
+  
+  all_states_old = state_ordering(gg)[,1]
+  all_states_new = state_ordering(gg)[,2]
+  
+  row_initial = sapply(1:length(initial_state), function(p) which(all_states_old == initial_state[p], arr.ind = TRUE))
+  row_absorbing = sapply(1:length(absorbing_state), function(p) which(all_states_old == absorbing_state[p], arr.ind = TRUE))
+  
+  
+  transient_state_new = c()  
+  for(p in 1:length(all_states_old)){
+    if(!(all_states_old[p] %in% absorbing_state) & !(all_states_old[p] %in% initial_state)){
+      transient_state_new  = c(transient_state_new, all_states_new[p])
+    }
+  }
+  initial_state_new = sapply(row_initial, function(p) state_ordering(gg)[p,2])
+  absorbing_state_new = sapply(row_absorbing, function(p) state_ordering(gg)[p,2])
+  
+  
+  if(!is.null(abs_int_cens)){
+    row_absorbing = sapply(1:length(absorbing_state), function(p) which(all_states_old == absorbing_state[p], arr.ind = TRUE))
+    absorbing_state_int_cens = sapply(row_absorbing, function(p) state_ordering(gg)[p,2])
+    absorbing_state_r_cens = which(!(absorbing_state_new %in% absorbing_state_int_cens))
+  }
+  
+  
+  ## Back to the timepoints - making an empty matrix with correct time points
+  ddr = relevant_timepoints(data_set, gg)
+  inds = unique(ddr$PTNUM)
+  nn = length(inds)
+  if(is.null(abs_int_cens)){
+    timepoints = matrix(NA,nn,length(initial_state) + length(absorbing_state) + 2*length(transient_state_new) +1)
+    names_middle = paste(rep("t", length(initial_state) + 2*length(transient_state_new) + length(absorbing_state)),
+                         c(initial_state_new, rep(transient_state_new,each = 2), absorbing_state_new), 
+                         rep(c("M", "m"), 
+                             (length(initial_state) + 2*length(transient_state_new) + length(absorbing_state))/2), sep="")
+    
+  } else{
+    timepoints = matrix(NA,nn,length(initial_state) + length(absorbing_state)- length(abs_int_cens) + 2*length(transient_state_new)+2*length(abs_int_cens) +1)
+    names_middle = paste(rep("t", length(initial_state) + 2*length(transient_state_new) + 2*length(abs_int_cens) + length(absorbing_state_new)-length(abs_int_cens)),
+                         c(initial_state_new, rep(transient_state_new,each = 2), rep(abs_int_cens, each = 2), absorbing_state_r_cens), 
+                         rep(c("M", "m"), 
+                             (length(initial_state) + 2*length(transient_state_new) + 2*length(absorbing_state_int_cens) + length(absorbing_state_r_cens))/2), sep="")
+  }
+  colnames(timepoints) = c(names_middle, "obs_type")
+  
+  if(is.null(abs_int_cens)){
+    ## Filling out the timepoints matrix
+    otypes = rep(NA,nn) # a vector indicating the observation type of each patient
+    for (i in 1:nn){
+      ddi = ddr[which(ddr$PTNUM==inds[i]),]
+      tti = ddi$years[pmatch(c(initial_state_new, rep(transient_state_new, each = 2),
+                               absorbing_state_new),ddi$state)]
+      names(tti) = as.character(c(initial_state_new, rep(transient_state_new, each = 2),
+                                  absorbing_state_new),ddi$state)
+      
+      for(j in 2:length(tti)){
+        ## If the initial state(s) column number is odd/even, then all the "M"'s are also odd/even.
+        ## It is the "M"'s which potentially are NA. Do not want to fill them if both are NA
+        if((length(initial_state) %% 2) == (j %% 2) & j > length(initial_state) & 
+           j <= (length(initial_state) + 2*length(transient_state_new))){
+          if (is.na(tti[j]) & !is.na(tti[j-1])){
+            tti[j] = tti[j-1]
+          }
+        }
+      }
+      timepoints[i,1:(ncol(timepoints)-1)] = tti
+      ## Which observed type the individual is
+      timepoints[i, ncol(timepoints)] = paste(unique(names(tti[!(is.na(tti))])), collapse ="")
+      if(timepoints[i,"obs_type"] == "023"){
+        timepoints[i, "t1m"] = timepoints[i, "t2m"] 
+        timepoints[i, "t1M"] = timepoints[i, "t2m"]
+      }
+    }
+  } else{
+    ## Filling out the timepoints matrix
+    otypes = rep(NA,nn) # a vector indicating the observation type of each patient
+    for (i in 1:nn){
+      ddi = ddr[which(ddr$PTNUM==inds[i]),]
+      tti = ddi$years[pmatch(c(initial_state_new, rep(transient_state_new, each = 2),
+                               rep(absorbing_state_int_cens, each = 2), absorbing_state_r_cens),ddi$state)]
+      names(tti) = as.character(c(initial_state_new, rep(transient_state_new, each = 2),
+                                  rep(absorbing_state_int_cens, each = 2), absorbing_state_r_cens),ddi$state)
+      
+      for(j in 2:length(tti)){
+        ## If the initial state(s) column number is odd/even, then all the "M"'s are also odd/even.
+        ## It is the "M"'s which potentially are NA. Do not want to fill them if both are NA
+        if((length(initial_state) %% 2) == (j %% 2) & j > length(initial_state) & 
+           j <= (length(initial_state) + 2*length(transient_state_new) + 2*length(absorbing_state_int_cens))){
+          if (is.na(tti[j]) & !is.na(tti[j-1])){
+            tti[j] = tti[j-1]
+          }
+        }
+      }
+      timepoints[i,1:(ncol(timepoints)-1)] = tti
+      ## Which observed type the individual is
+      timepoints[i, ncol(timepoints)] = paste(unique(names(tti[!(is.na(tti))])), collapse ="")
+    }
+  }
+
+  return(timepoints) 
+}
+arrange_data_exact(dd,gg,NULL)
+
+## Finding all types, integrand, time points ++
+formula_obs_types = all_types(gg)
+all_data_set = arrange_data(data_set = dd, gg)
+observation_type = rep(NA, nrow(all_data_set))
+all_integral_limits = list()
+integrand = list()
+all_types = list()
+type_integrand = list()
+limits = list()
+
+
+all_data_set_exact = arrange_data_exact(dd,gg,NULL)
+for(i in 1:nrow(all_data_set)){
+  observation_type[i] = all_data_set[i,"obs_type"]
+  type = names(which(formula_obs_types[, observation_type[i]] == 1))
+  if(observation_type[i] %in% type){
+    type = observation_type[i]
+  }
+  integrand_mellomregn = list()
+  integral_mellomregn= list()
+  type_1 = list()
+  type_integrand[[i]] = type_to_integrand_absExact(type, edge_mats, densities, survival_functions, edge_abs)
+  limits[[i]] = finding_limits_integral(i, type, gg, all_edges, absorbing_state_new, all_data_set = all_data_set_exact)
+}
+
+## Make additional input for cubintegrate
+from_time_point_to_integral_exact = function(param, method1 = "hcubature", integrand = integrand, length_all_data = length_all_data,
+                                       all_integral_limits = all_integral_limits, mc_cores = 2){
+  print(param)
+  ## Including all types and the data set
+  final_integral = sum(unlist(mclapply(1:length_all_data, function(i){
+    ## Using the observation type to find all possible formula types
+    ## If we only have one type for this observation type
+    if(length(all_integral_limits[[i]]) == 1){
+      lower_integral_mellomregn = c(as.numeric(all_integral_limits[[i]][[1]][1]), as.numeric(all_integral_limits[[i]][[1]][3]),
+                                    as.numeric(all_integral_limits[[i]][[1]][5]), as.numeric(all_integral_limits[[i]][[1]][7]))
+      lower_integral = lower_integral_mellomregn[!is.na(lower_integral_mellomregn)]
+      upper_integral_mellomregn = c(as.numeric(all_integral_limits[[i]][[1]][2]), as.numeric(all_integral_limits[[i]][[1]][4]),
+                                    as.numeric(all_integral_limits[[i]][[1]][6]), as.numeric(all_integral_limits[[i]][[1]][8]))
+      upper_integral = upper_integral_mellomregn[!is.na(upper_integral_mellomregn)]
+      tmax = as.numeric(all_integral_limits[[i]][[1]][9])
+      
+      length_lower_integral = length(lower_integral)
+      length_unique_lower_integral = length(unique(lower_integral))
+      
+      if(length_lower_integral == 0){
+        log(integrand[[i]][[1]](tt = tmax, param = param))
+      } else if(length_unique_lower_integral != length_lower_integral){
+        log(cubintegrate(integrand[[i]][[1]], lower = lower_integral, upper = upper_integral, relTol = .Machine$double.eps^0.25,
+                         absTol = .Machine$double.eps^0.25, method = "vegas",tt = tmax, param = param, maxEval = 10^3)[[1]])
+      } else if(length_unique_lower_integral == length_lower_integral){
+        log(cubintegrate(integrand[[i]][[1]], lower = lower_integral, upper = upper_integral, relTol = .Machine$double.eps^0.25,
+                         absTol = .Machine$double.eps^0.25, method = method1, norm = "LINF",tt = tmax, param = param)[[1]])
+      }
+    } else{ #if(length(all_integral_limits[[i]]) > 1){ ## If we have more than one type for this observation type
+      calculate_integral_multiple_types = rep(NA, length(all_integral_limits[[i]]))
+      for(j in 1:length(all_integral_limits[[i]])){
+        lower_integral_mellomregn = c(as.numeric(all_integral_limits[[i]][[j]][1]), as.numeric(all_integral_limits[[i]][[j]][3]), 
+                                      as.numeric(all_integral_limits[[i]][[j]][5]), as.numeric(all_integral_limits[[i]][[j]][7]))
+        lower_integral = lower_integral_mellomregn[!is.na(lower_integral_mellomregn)]
+        upper_integral_mellomregn = c(as.numeric(all_integral_limits[[i]][[j]][2]), as.numeric(all_integral_limits[[i]][[j]][4]),
+                                      as.numeric(all_integral_limits[[i]][[j]][6]), as.numeric(all_integral_limits[[i]][[j]][8]))
+        upper_integral = upper_integral_mellomregn[!is.na(upper_integral_mellomregn)]
+        tmax = as.numeric(all_integral_limits[[i]][[j]][9])
+        
+        length_lower_integral = length(lower_integral)
+        length_unique_lower_integral = length(unique(lower_integral))
+        
+        if(length_lower_integral == 0){
+          calculate_integral_multiple_types[j] = integrand[[i]][[j]](tt = tmax, param = param)
+        } else if(length_unique_lower_integral != length_lower_integral){
+          calculate_integral_multiple_types[j] = cubintegrate(integrand[[i]][[j]], lower = lower_integral, upper = upper_integral, method = "vegas", maxEval = 1000,
+                                                              relTol = .Machine$double.eps^0.25,
+                                                              absTol = .Machine$double.eps^0.25, tt = tmax, param = param)[[1]]
+        } else if(length_unique_lower_integral == length_lower_integral){
+          calculate_integral_multiple_types[j] = cubintegrate(integrand[[i]][[j]], lower = lower_integral, upper = upper_integral, 
+                                                              relTol = .Machine$double.eps^0.25,
+                                                              absTol = .Machine$double.eps^0.25, norm = "LINF", 
+                                                              method = method1, tt = tmax, param = param)[[1]]
+        } 
+      }
+      ## Taking the log of the sum of the likelihood contribution for each possible type
+      log(sum(calculate_integral_multiple_types))
+    }
+  }, mc.cores = mc_cores), use.names = FALSE))
+  return(final_integral)
+}
 
