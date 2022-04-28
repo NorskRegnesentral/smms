@@ -99,7 +99,7 @@ type_to_integrand_absExact = function(type,edge_mats,edge_abs){
   f_trav <- rep(NA,n_trav)
   if (n_trav>0){
     for (i in 1:n_trav){
-      f_trav[i] <- paste(density_names[which(travi==i)],"(param,",variable_names_eval[i],")","*")
+      f_trav[i] <- paste(density_names[which(travi==i)],"(param,x,",variable_names_eval[i],")","*")
     }
   }
   
@@ -113,7 +113,7 @@ type_to_integrand_absExact = function(type,edge_mats,edge_abs){
       n_pass_i <- sum(passi==i)
       if (n_pass_i==0) next
       for (j in 1:n_pass_i){
-        S_passed[ii] <- paste(surv_names[which(passi==i)][j],"(param,",variable_names_eval[i],")","*")
+        S_passed[ii] <- paste(surv_names[which(passi==i)][j],"(param,x,",variable_names_eval[i],")","*")
         ii <- ii+1
       }
     }
@@ -134,7 +134,7 @@ type_to_integrand_absExact = function(type,edge_mats,edge_abs){
       n_posi_i <- sum(posi==i)
       if (n_posi_i==0) next
       for (j in 1:n_posi_i){
-        S_posi[ii] <- paste(surv_names[which(posi==i)][j],"(param,",eval,")","*")
+        S_posi[ii] <- paste(surv_names[which(posi==i)][j],"(param,x,",eval,")","*")
         ii <- ii+1
       }
     }
@@ -151,7 +151,7 @@ type_to_integrand_absExact = function(type,edge_mats,edge_abs){
   }
   
   # paste everything together
-  f_intro <- "function(xx,tt,param){"
+  f_intro <- "function(xx,tt,param,x){"
   f_end <- "}"
   f_prod <- paste(paste(f_trav,collapse=""),paste(S_passed,collapse=""),paste(S_posi,collapse=""))
   ff <- paste(f_intro,paste(var_def,collapse=""),f_prod,f_end)
@@ -193,7 +193,7 @@ type_to_integrand_absExact_v2 = function(type,edge_mats,edge_abs){
   f_trav <- rep(NA,n_trav)
   if (n_trav>0){
     for (i in 1:n_trav){
-      f_trav[i] <- paste(density_names[which(travi==i)],"(param,",variable_names_eval[i],")","*")
+      f_trav[i] <- paste(density_names[which(travi==i)],"(param,x,",variable_names_eval[i],")","*")
     }
   }
   
@@ -207,7 +207,7 @@ type_to_integrand_absExact_v2 = function(type,edge_mats,edge_abs){
       n_pass_i <- sum(passi==i)
       if (n_pass_i==0) next
       for (j in 1:n_pass_i){
-        S_passed[ii] <- paste(surv_names[which(passi==i)][j],"(param,",variable_names_eval[i],")","*")
+        S_passed[ii] <- paste(surv_names[which(passi==i)][j],"(param,x,",variable_names_eval[i],")","*")
         ii <- ii+1
       }
     }
@@ -225,7 +225,7 @@ type_to_integrand_absExact_v2 = function(type,edge_mats,edge_abs){
       n_posi_i <- sum(posi==i)
       if (n_posi_i==0) next
       for (j in 1:n_posi_i){
-        S_posi[ii] <- paste(surv_names[which(posi==i)][j],"(param,",eval,")","*")
+        S_posi[ii] <- paste(surv_names[which(posi==i)][j],"(param,x,",eval,")","*")
         ii <- ii+1
       }
     }
@@ -242,7 +242,7 @@ type_to_integrand_absExact_v2 = function(type,edge_mats,edge_abs){
   }
   
   # paste everything together
-  f_intro <- paste("function(",paste(var_def,collapse=""),"tt,param){")
+  f_intro <- paste("function(",paste(var_def,collapse=""),"tt,param,x){")
   f_end <- "}"
   f_prod <- paste(paste(f_trav,collapse=""),paste(S_passed,collapse=""),paste(S_posi,collapse=""))
   ff <- paste(f_intro,f_prod,f_end)
@@ -331,7 +331,7 @@ finding_limits_integral = function(i, type, gg, all_edges, absorbing_state_new, 
 
 ## Make additional input for cubintegrate
 from_time_point_to_integral = function(param, method1 = "hcubature", integrand = integrand,integrand2 = integrand2, 
-                                       all_integral_limits = all_integral_limits, mc_cores = 2){
+                                       all_integral_limits = all_integral_limits, X = NULL, mc_cores = 2){
   ## Including all types and the data set
   final_integral = sum(unlist(mclapply(1:length(integrand), function(i){
     ## Using the observation type to find all possible formula types
@@ -348,17 +348,20 @@ from_time_point_to_integral = function(param, method1 = "hcubature", integrand =
       #print(i)
       
       if(length_lower_integral == 0){
-        calculate_integral_multiple_types[j] = integrand[[i]][[j]](xx=1,tt = tmax, param = param) # the value of xx does not matter
+        calculate_integral_multiple_types[j] = integrand[[i]][[j]](xx=1,tt = tmax, param = param, x = X[i,]) # the value of xx does not matter
       }else if(length_lower_integral>0){
         if(length_lower_integral<=2 ){
-          calculate_integral_multiple_types[j] = repintegrate(integrand2[[i]][[j]],tt=tmax,lower=lower_integral,upper = upper_integral, param = param)
+          calculate_integral_multiple_types[j] = repintegrate(integrand2[[i]][[j]],tt=tmax,lower=lower_integral,
+                                                              upper = upper_integral, param = param, x = X[i,])
         }else if (length_lower_integral>2){
           if (length_unique_lower_integral != length_lower_integral){
-            calculate_integral_multiple_types[j] = cubintegrate(integrand[[i]][[j]], lower = lower_integral, upper = upper_integral, method = "divonne", maxEval = 500,
-                                                                tt = tmax, param = param)$integral
+            calculate_integral_multiple_types[j] = cubintegrate(integrand[[i]][[j]], lower = lower_integral, 
+                                                                upper = upper_integral, method = "divonne", maxEval = 500,
+                                                                tt = tmax, param = param, x = X[i,])$integral
           }else if (length_unique_lower_integral == length_lower_integral){
-            calculate_integral_multiple_types[j] = cubintegrate(integrand[[i]][[j]], lower = lower_integral, upper = upper_integral,maxEval = 500,
-                                                                method = method1, tt = tmax, param = param)$integral
+            calculate_integral_multiple_types[j] = cubintegrate(integrand[[i]][[j]], lower = lower_integral,
+                                                                upper = upper_integral,maxEval = 500,
+                                                                method = method1, tt = tmax, param = param, x = X[i,])$integral
           }
         }
       } 
@@ -372,21 +375,21 @@ from_time_point_to_integral = function(param, method1 = "hcubature", integrand =
 
 ##
 # Integrals over functions of 2 variables
-repint2 <- function(ss,innerfunc,tt,param,lower2,upper2){ #integrate over uu
+repint2 <- function(ss,innerfunc,tt,param,lower2,upper2,x){ #integrate over uu
   mm <- length(ss)
   out <- rep(NA,mm)
   for (i in 1:mm){
-    out[i] <- integrate(innerfunc,lower=max(lower2-ss[i],0),upper=upper2-ss[i],tt=tt,
+    out[i] <- integrate(innerfunc,lower=max(lower2-ss[i],0),upper=upper2-ss[i],tt=tt,x=x,
                         ss=ss[i],param=param)$value
   }
   return(out)
 } 
 # Integral over functions of 1 variable
-repintegrate <- function(innerfunc,tt,param,lower,upper){ #integrate over ss
+repintegrate <- function(innerfunc,tt,param,x,lower,upper){ #integrate over ss
   if (length(lower)==1){
-    out <- integrate(innerfunc,lower=lower,upper=upper,tt=tt,param=param)$value
+    out <- integrate(innerfunc,lower=lower,upper=upper,tt=tt,param=param,x=x)$value
   }else{
-    out <- integrate(repint2,innerfunc=innerfunc,lower=max(lower[1],0),upper=upper[1],tt=tt,param=param,
+    out <- integrate(repint2,innerfunc=innerfunc,lower=max(lower[1],0),upper=upper[1],tt=tt,param=param,x=x,
                      lower2=lower[2],upper2=upper[2])$value
   }
   return(out)
