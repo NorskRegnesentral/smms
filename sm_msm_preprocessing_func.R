@@ -1,60 +1,48 @@
 ### Multi-state functions part 1 - preprocessing
 
 
-## 2.1
-## Input: gg (the graph)
-state_ordering = function(gg){
+#' Produce an ordering of the states in a multi-state graph
+#'
+#' @param graph A directed, acyclic graph in the igraph format (igraph package).
+#' @return A data.frame with two columns giving a mapping from the state names (first column) to a partial ordering of the states 
+#' (from 0 to k, and where a higher number indicates that a state is further removed from the initial state).
+state_ordering = function(graph){
   ## Calculating the initial state
-  all_edges = get.edgelist(gg)
-  all_initial = which(!(all_edges[,1] %in% all_edges[,2]))
-  initial_state = unique(sapply(all_initial, function(r) all_edges[r,1]))
+  all_edges = get.edgelist(graph)
+  id_initial = which(!(all_edges[,1] %in% all_edges[,2]))
+  initial_states = unique(all_edges[id_initial,1])
   
-  state_num = matrix(nrow = 0, ncol = 2)
-  ## Considering all the possible initial states
-  for(i in 1:length(initial_state)){
-    all_states = all_simple_paths(gg, initial_state[i])
-    form_types = c()
-    for(j in 1:length(all_states)){
-      data_frame_subset_type_as_char = paste(as.data.frame(t(sapply(all_states[j], as_ids))), collapse = ".")
-      form_types = c(form_types, data_frame_subset_type_as_char)
-    }
-    state_num = rbind(c(initial_state[i], as.character(i - 1)))
+  id_absorbing = which(!(all_edges[,2] %in% all_edges[,1]))
+  absorbing_states = unique(all_edges[id_absorbing,2])
+  
+  k = length(as_ids(V(graph))) #number of states
+  
+  state_num = data.frame(state=as_ids(V(graph)),order=NA)
+  colnames(state_num) <- c("state","order")
+  state_num$order[which(state_num$state %in% initial_states)] <- 0:(length(initial_states)-1)
+  
+  # For the transient states (not initial or absorbing)
+  dists <- distances(graph,mode="in")
+  transient_states <-  state_num$state[-which(state_num$state %in% initial_states | state_num$state %in% absorbing_states)]
+  min_dists <- rep(NA,length(transient_states))
+  for (i in 1:length(transient_states)){
+    min_dists[i] <- min(dists[transient_states[i],initial_states])
   }
-  ## Split these into types
-  str_split = matrix(ncol = max(sapply(1:length(form_types), function(j) length(unlist(strsplit(form_types[j], "[.]"))))), 
-                     nrow = length(form_types))
-  for(j in 1:length(form_types)){
-    for(p in 1:length(unlist(strsplit(form_types[j], "[.]")))){
-      str_split[j,p] = unlist(strsplit(form_types[j], "[.]"))[p]
-    }
-  }
-  ## Arranging into a "predetermined" 
-  for(j in 2:ncol(str_split)){
-    for(p in 1:nrow(str_split)){
-      if(j < ncol(str_split)){
-        if(!(str_split[p, j] %in% state_num[,1]) & !(str_split[p, j] %in% str_split[, (j+1):ncol(str_split)]) & !is.na(str_split[p,j])){
-          state_num = rbind(state_num, c(str_split[p,j], as.character(as.numeric(state_num[nrow(state_num),2]) + 1)))
-        }
-      } else if(j == ncol(str_split)){
-        if(!(str_split[p, j] %in% state_num[,1]) & !is.na(str_split[p,j])){
-          state_num = rbind(state_num, c(str_split[p,j], as.character(as.numeric(state_num[nrow(state_num),2]) + 1)))
-        }
-      }
-    }
-  }
-  colnames(state_num) = c("prev", "new")
+  state_num$order[which(state_num$state %in% transient_states)] <- order(min_dists)+max(state_num$order,na.rm=T)
+  
+  state_num$order[which(state_num$state %in% absorbing_states)] <- (k-1-length(absorbing_states)+1):(k-1)
   return(state_num)
 }
 
 
 ## 2.2 Keep only relevant timepoints
-## Input: data_set (the dataset to consider), gg (the graph)
-relevant_timepoints = function(data_set, gg){
+## Input: data_set (the dataset to consider), graph (the graph)
+relevant_timepoints = function(data_set, graph){
   inds = unique(data_set$patient)
   nn = length(inds)
   ddr = data_set
-  states_in_dataset = as.numeric(state_ordering(gg)[,1]) 
-  all_states_ordered = as.numeric(state_ordering(gg)[,2])
+  states_in_dataset = as.numeric(state_ordering(graph)[,1]) 
+  all_states_ordered = as.numeric(state_ordering(graph)[,2])
   for(j in 1:length(states_in_dataset)){
     ddr$state = replace(ddr$state, which(ddr$state == states_in_dataset[j]), all_states_ordered[j])
   }
@@ -84,11 +72,11 @@ relevant_timepoints = function(data_set, gg){
 
 
 ## 2.3 Construct formula types
-## Input: gg (the graph)
-construct_formula_types = function(gg){
+## Input: graph (the graph)
+construct_formula_types = function(graph){
   ## Tranforming the graph to the "new" states
-  state_start = min(as.numeric(state_ordering(gg)[,2]))
-  state_end = max(as.numeric(state_ordering(gg)[,2]))
+  state_start = min(as.numeric(state_ordering(graph)[,2]))
+  state_end = max(as.numeric(state_ordering(graph)[,2]))
   subsets = matrix(nrow = 0, ncol = 2)
   for(i in 1:length(state_start)){
     for(j in 1:length(state_end)){
@@ -97,13 +85,13 @@ construct_formula_types = function(gg){
     }
   }
   
-  ## The ordering of V(gg) can be different from state_ordering
-  new_gg_name = c()
-  for(i in 1:nrow(state_ordering(gg))){
-    r = match(V(gg)$name[i], state_ordering(gg)[,1])
-    new_gg_name = c(new_gg_name, state_ordering(gg)[r,2])
+  ## The ordering of V(graph) can be different from state_ordering
+  new_graph_name = c()
+  for(i in 1:nrow(state_ordering(graph))){
+    r = match(V(graph)$name[i], state_ordering(graph)[,1])
+    new_graph_name = c(new_graph_name, state_ordering(graph)[r,2])
   }
-  V(gg)$name = new_gg_name
+  V(graph)$name = new_graph_name
   
   characters_subset_vector = NULL
   form_types = c()
@@ -114,7 +102,7 @@ construct_formula_types = function(gg){
     for(i in 1:ncol(subsets)){
       characters_subset_vector[i] = as.character(subsets[p, i])
     }
-    subset_size = all_simple_paths(gg, characters_subset_vector[1], 
+    subset_size = all_simple_paths(graph, characters_subset_vector[1], 
                                    characters_subset_vector[ncol(subsets)])
     ## If only observed in initial state
     if(length(subset_size) == 0){
@@ -131,14 +119,14 @@ construct_formula_types = function(gg){
 
 
 ## 2.4 Find observation times
-## Input: gg (the graph)
-construct_obs_types = function(gg){
+## Input: graph (the graph)
+construct_obs_types = function(graph){
   ## Finding the initial state
-  all_edges = get.edgelist(gg)
+  all_edges = get.edgelist(graph)
   all_initial = which(!(all_edges[,1] %in% all_edges[,2]))
   initial_state = unique(sapply(1:length(all_initial), function(r) all_edges[r,1]))
   
-  num_states = length(as.numeric(state_ordering(gg)[,2]))
+  num_states = length(as.numeric(state_ordering(graph)[,2]))
   num_init = length(initial_state)
   states = 0:(num_states-1) # assumes that the states are enumerated from 0 to k, with the initial state in the beginning
   num_obs_types = num_init + num_init*sum(choose((num_states-num_init),1:(num_states-num_init)))
@@ -158,10 +146,10 @@ construct_obs_types = function(gg){
 
 
 ## 2.5 Links between formula and observation types
-## Input: gg (the graph) 
-all_types = function(gg){
-  formula_types = construct_formula_types(gg)
-  observation_types = construct_obs_types(gg)
+## Input: graph (the graph) 
+all_types = function(graph){
+  formula_types = construct_formula_types(graph)
+  observation_types = construct_obs_types(graph)
   matrix_all_types = matrix(data = 0, nrow = length(formula_types), ncol = length(observation_types))
   rownames(matrix_all_types) = formula_types
   colnames(matrix_all_types) = observation_types
@@ -181,17 +169,17 @@ all_types = function(gg){
 
 
 ## 2.6 Arrange data
-## Input: data_set (the dataset to consider), gg (the graph)
-arrange_data = function(data_set, gg, abs_int_cens = NULL){
+## Input: data_set (the dataset to consider), graph (the graph)
+arrange_data = function(data_set, graph, abs_int_cens = NULL){
   ## Finding the initial, transient and absorbing states - in the "new" format with 0, 1, ...
-  all_edges = get.edgelist(gg)
+  all_edges = get.edgelist(graph)
   all_initial = which(!(all_edges[,1] %in% all_edges[,2]))
   initial_state = unique(sapply(all_initial, function(p) all_edges[p,1]))
   all_absorbing = which(!(all_edges[,2] %in% all_edges[,1]))
   absorbing_state = unique(sapply(all_absorbing, function(p) all_edges[p,2]))
   
-  all_states_old = state_ordering(gg)[,1]
-  all_states_new = state_ordering(gg)[,2]
+  all_states_old = state_ordering(graph)[,1]
+  all_states_new = state_ordering(graph)[,2]
   
   row_initial = sapply(1:length(initial_state), function(p) which(all_states_old == initial_state[p], arr.ind = TRUE))
   row_absorbing = sapply(1:length(absorbing_state), function(p) which(all_states_old == absorbing_state[p], arr.ind = TRUE))
@@ -203,19 +191,19 @@ arrange_data = function(data_set, gg, abs_int_cens = NULL){
       transient_state_new  = c(transient_state_new, all_states_new[p])
     }
   }
-  initial_state_new = sapply(row_initial, function(p) state_ordering(gg)[p,2])
-  absorbing_state_new = sapply(row_absorbing, function(p) state_ordering(gg)[p,2])
+  initial_state_new = sapply(row_initial, function(p) state_ordering(graph)[p,2])
+  absorbing_state_new = sapply(row_absorbing, function(p) state_ordering(graph)[p,2])
   
   
   if(!is.null(abs_int_cens)){
     row_absorbing = sapply(1:length(absorbing_state), function(p) which(all_states_old == absorbing_state[p], arr.ind = TRUE))
-    absorbing_state_int_cens = sapply(row_absorbing, function(p) state_ordering(gg)[p,2])
+    absorbing_state_int_cens = sapply(row_absorbing, function(p) state_ordering(graph)[p,2])
     absorbing_state_r_cens = which(!(absorbing_state_new %in% absorbing_state_int_cens))
   }
   
   
   ## Back to the timepoints - making an empty matrix with correct time points
-  ddr = relevant_timepoints(data_set, gg)
+  ddr = relevant_timepoints(data_set, graph)
   inds = unique(ddr$patient)
   nn = length(inds)
   if(is.null(abs_int_cens)){
@@ -289,25 +277,25 @@ arrange_data = function(data_set, gg, abs_int_cens = NULL){
 
 
 ## 2.7 Make edge matrices
-## Input: gg (the graph)
-edge_matrices = function(gg){
+## Input: graph (the graph)
+edge_matrices = function(graph){
   ## Make a duplicate to not change the original graph
-  gg2 = gg
-  ## The ordering of V(gg) can be different from state_ordering
-  new_gg_name = c()
-  for(i in 1:nrow(state_ordering(gg2))){
-    r = match(V(gg2)$name[i], state_ordering(gg2)[,1])
-    new_gg_name = c(new_gg_name, state_ordering(gg2)[r,2])
+  graph2 = graph
+  ## The ordering of V(graph) can be different from state_ordering
+  new_graph_name = c()
+  for(i in 1:nrow(state_ordering(graph2))){
+    r = match(V(graph2)$name[i], state_ordering(graph2)[,1])
+    new_graph_name = c(new_graph_name, state_ordering(graph2)[r,2])
   }
-  V(gg2)$name = new_gg_name
-  data_frame_possible_travels = get.data.frame(gg2, what= "edges" )
+  V(graph2)$name = new_graph_name
+  data_frame_possible_travels = get.data.frame(graph2, what= "edges" )
   
   ## Make all of the possible travels into characters
   data_frame_travels = c()
   for(i in 1:nrow(data_frame_possible_travels)){
     data_frame_travels = c(data_frame_travels, paste(data_frame_possible_travels[i,], collapse = ""))
   }
-  formula_types = construct_formula_types(gg)
+  formula_types = construct_formula_types(graph)
   
   ## Make a matrix for all the edges traveled
   matrix_travelled = matrix(data = 0, nrow = length(formula_types), ncol = length(data_frame_travels))
