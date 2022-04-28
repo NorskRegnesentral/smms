@@ -50,7 +50,7 @@ state_ordering = function(gg){
 ## 2.2 Keep only relevant timepoints
 ## Input: data_set (the dataset to consider), gg (the graph)
 relevant_timepoints = function(data_set, gg){
-  inds = unique(data_set$PTNUM)
+  inds = unique(data_set$patient)
   nn = length(inds)
   ddr = data_set
   states_in_dataset = as.numeric(state_ordering(gg)[,1]) 
@@ -60,7 +60,7 @@ relevant_timepoints = function(data_set, gg){
   }
   idd = NULL
   for (i in 1:nn){
-    ddi = data_set[which(data_set$PTNUM==inds[i]),]
+    ddi = data_set[which(data_set$patient==inds[i]),]
     states = ddi$state
     ddi$state = states
     rlei = matrix(0,2,length(all_states_ordered))
@@ -76,7 +76,7 @@ relevant_timepoints = function(data_set, gg){
         id_unrelevant = c(id_unrelevant,(sum(rlei[2,1:(j-1)])+2):sum(rlei[2,1:j]))
       }
     }
-    idd = c(idd,which(dd$PTNUM==inds[i])[id_unrelevant])
+    idd = c(idd,which(ddr$patient==inds[i])[id_unrelevant])
   }
   ddr = ddr[-idd,]
   return(ddr)
@@ -216,14 +216,14 @@ arrange_data = function(data_set, gg, abs_int_cens = NULL){
   
   ## Back to the timepoints - making an empty matrix with correct time points
   ddr = relevant_timepoints(data_set, gg)
-  inds = unique(ddr$PTNUM)
+  inds = unique(ddr$patient)
   nn = length(inds)
   if(is.null(abs_int_cens)){
     timepoints = matrix(NA,nn,length(initial_state) + length(absorbing_state) + 2*length(transient_state_new) +1)
     names_middle = paste(rep("t", length(initial_state) + 2*length(transient_state_new) + length(absorbing_state)),
                          c(initial_state_new, rep(transient_state_new,each = 2), absorbing_state_new), 
-                         rep(c("M", "m"), 
-                             (length(initial_state) + 2*length(transient_state_new) + length(absorbing_state))/2), sep="")
+                         c("M",rep(c("m","M"),length(transient_state_new)),rep("m",length(absorbing_state))), sep="")
+    ### C has fixed above
     
   } else{
     timepoints = matrix(NA,nn,length(initial_state) + length(absorbing_state)- length(abs_int_cens) + 2*length(transient_state_new)+2*length(abs_int_cens) +1)
@@ -238,8 +238,8 @@ arrange_data = function(data_set, gg, abs_int_cens = NULL){
     ## Filling out the timepoints matrix
     otypes = rep(NA,nn) # a vector indicating the observation type of each patient
     for (i in 1:nn){
-      ddi = ddr[which(ddr$PTNUM==inds[i]),]
-      tti = ddi$years[pmatch(c(initial_state_new, rep(transient_state_new, each = 2),
+      ddi = ddr[which(ddr$patient==inds[i]),]
+      tti = ddi$time[pmatch(c(initial_state_new, rep(transient_state_new, each = 2),
                                absorbing_state_new),ddi$state)]
       names(tti) = as.character(c(initial_state_new, rep(transient_state_new, each = 2),
                                   absorbing_state_new),ddi$state)
@@ -262,8 +262,8 @@ arrange_data = function(data_set, gg, abs_int_cens = NULL){
     ## Filling out the timepoints matrix
     otypes = rep(NA,nn) # a vector indicating the observation type of each patient
     for (i in 1:nn){
-      ddi = ddr[which(ddr$PTNUM==inds[i]),]
-      tti = ddi$years[pmatch(c(initial_state_new, rep(transient_state_new, each = 2),
+      ddi = ddr[which(ddr$patient==inds[i]),]
+      tti = ddi$time[pmatch(c(initial_state_new, rep(transient_state_new, each = 2),
                                rep(absorbing_state_int_cens, each = 2), absorbing_state_r_cens),ddi$state)]
       names(tti) = as.character(c(initial_state_new, rep(transient_state_new, each = 2),
                                   rep(absorbing_state_int_cens, each = 2), absorbing_state_r_cens),ddi$state)
