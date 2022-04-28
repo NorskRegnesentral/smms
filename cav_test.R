@@ -11,6 +11,7 @@ source("sm_msm_preprocessing_func.R")
 source("sm_msm_likelihood_func.R")
 
 ## Preprocessing
+gg = graph_from_literal("1"--+"2"--+"3", "1"--+"2", "1"--+"3")
 gg = graph_from_literal("1"--+"2"--+"3"--+"4", "1"--+"4", "2"--+"4")
 
 # Testing for CAV-data
@@ -22,19 +23,20 @@ id_wrong = unique(dd$PTNUM[which(dd$state!=dd$statemax)])  # observations where 
 dd = dd[-which(dd$PTNUM %in% id_wrong),]
 ## Only relevant parts 
 dd = dd[ ,-c(2, 4, 5, 6, 7, 9, 10)]
+colnames(dd)[1:2] <- c("patient","time")
 
 # Model:
-S_01 = function(param, t){(as.numeric(t>=0))* (1-pweibull(t,param[1],param[2]))}
-S_12 = function(param, t){(as.numeric(t>=0))* (1-pweibull(t,param[3],param[4]))}
-S_23 = function(param, t){(as.numeric(t>=0))* (1-pweibull(t,param[5],param[6]))}
-S_03 = function(param, t){(as.numeric(t>=0))* (1-pweibull(t,param[7],param[8]))}
-S_13 = function(param, t){(as.numeric(t>=0))* (1-pweibull(t,param[9],param[10]))}
+S_01 = function(param, x, t){(as.numeric(t>=0))* (1-pweibull(t,param[1],param[2]))}
+S_12 = function(param, x, t){(as.numeric(t>=0))* (1-pweibull(t,param[3],param[4]))}
+S_23 = function(param, x, t){(as.numeric(t>=0))* (1-pweibull(t,param[5],param[6]))}
+S_03 = function(param, x, t){(as.numeric(t>=0))* (1-pweibull(t,param[7],param[8]))}
+S_13 = function(param, x, t){(as.numeric(t>=0))* (1-pweibull(t,param[9],param[10]))}
 
-f_01 = function(param, t){as.numeric(t>=0)*dweibull(t,param[1],param[2])}
-f_12 = function(param, t){as.numeric(t>=0)*dweibull(t,param[3],param[4])}
-f_23 = function(param, t){as.numeric(t>=0)*dweibull(t,param[5],param[6])}
-f_03 = function(param, t){as.numeric(t>=0)*dweibull(t,param[7],param[8])}
-f_13 = function(param, t){as.numeric(t>=0)*dweibull(t,param[9],param[10])}
+f_01 = function(param, x, t){as.numeric(t>=0)*dweibull(t,param[1],param[2])}
+f_12 = function(param, x, t){as.numeric(t>=0)*dweibull(t,param[3],param[4])}
+f_23 = function(param, x, t){as.numeric(t>=0)*dweibull(t,param[5],param[6])}
+f_03 = function(param, x, t){as.numeric(t>=0)*dweibull(t,param[7],param[8])}
+f_13 = function(param, x, t){as.numeric(t>=0)*dweibull(t,param[9],param[10])}
 
 densities <- c(f_01,f_03,f_12,f_13,f_23)
 names(densities) <- c("01","03","12","13","23")

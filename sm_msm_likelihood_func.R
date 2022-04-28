@@ -334,7 +334,7 @@ from_time_point_to_integral = function(param, method1 = "hcubature", integrand =
                                        all_integral_limits = all_integral_limits, X = NULL, mc_cores = 2){
   ## Including all types and the data set
   final_integral = sum(unlist(mclapply(1:length(integrand), function(i){
-    ## Using the observation type to find all possible formula types
+    ## Using the observation type to find all possible formula types 
     calculate_integral_multiple_types = rep(NA, length(all_integral_limits[[i]]))
     for(j in 1:length(all_integral_limits[[i]])){
       lower_integral_mellomregn = as.numeric(all_integral_limits[[i]][[j]][c(1,3,5,7)])
