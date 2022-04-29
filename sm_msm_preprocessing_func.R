@@ -63,21 +63,26 @@ relevant_timepoints = function(data_set, graph){
   abs <- state_ord$order[which(state_ord$type=="abs")]
   dists <- distances(graph,mode="in")
   
-  idd = NULL
+  # If the patient does not start in an initial state - add the appropriate initial state at time=0 (if the initial state is not 
+  # uniquely defined one just has to add one of the initial states)
   for (i in 1:nn){
     ddi = ddr[which(ddr$patient==inds[i]),]
-    
-    # If the patient does not start in an initial state - add the appropriate initial state at time=0 (if the initial state is not 
-    # uniquely defined one just has to add one of the initial states)
     if (sum(ddi$state %in% init)==0){
       min_state <- state_ord$state[which(state_ord$order==min(ddi$state))]
       id_init <- which.min(dists[min_state,-which(colnames(dists)==min_state)])[1]
       ddi_1 <- c(ddi$patient[i],0,state_ord$order[which(state_ord$state==names(id_init))])
       ddi <- rbind(ddi_1,ddi)
       ddr <- rbind(ddi,ddr[-which(ddr$patient==inds[i]),])
+    }else{
+      next
     }
-    
-    # Identify redundant timepoints
+  }
+  
+  # Identify redundant timepoints
+  idd = NULL
+  for (i in 1:nn){
+    ddi = ddr[which(ddr$patient==inds[i]),]
+  
     rle_i <- rle(ddi$state)
     id_unrelevant = NULL
     for(j in 1:length(rle_i$values)){
