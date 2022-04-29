@@ -1,11 +1,12 @@
 ### Multi-state functions part 1 - preprocessing
 
 
-#' Produce an ordering of the states in a multi-state graph
+#' Produce an ordering of the states from a multi-state graph
 #'
 #' @param graph A directed, acyclic graph in the igraph format (igraph package).
-#' @return A data.frame with two columns giving a mapping from the state names (first column) to a partial ordering of the states 
-#' (from 0 to k, and where a higher number indicates that a state is further removed from the initial state).
+#' @return A data frame with 3 columns giving a mapping from the state names (first column) to a partial ordering of the states 
+#' (second column, from 0 to k, and where a higher number indicates that a state is further removed from the initial state).
+#' The last column indicates whether each state is initial, absorbing or transient.
 state_ordering = function(graph){
   ## Calculating the initial state
   all_edges = get.edgelist(graph)
@@ -17,51 +18,77 @@ state_ordering = function(graph){
   
   k = length(as_ids(V(graph))) #number of states
   
-  state_num = data.frame(state=as_ids(V(graph)),order=NA)
-  colnames(state_num) <- c("state","order")
+  state_num = data.frame(state=as_ids(V(graph)),order=NA,type=NA)
   state_num$order[which(state_num$state %in% initial_states)] <- 0:(length(initial_states)-1)
+  state_num$type[which(state_num$state %in% initial_states)] <- "init"
   
-  # For the transient states (not initial or absorbing)
+  # For the transient states (not initial or absorbing): 
+  # the ones on the same path should be ordered according to distance from the initial state
   dists <- distances(graph,mode="in")
+  dists[which(is.infinite(dists))] <- NA
   transient_states <-  state_num$state[-which(state_num$state %in% initial_states | state_num$state %in% absorbing_states)]
-  min_dists <- rep(NA,length(transient_states))
+  m_dists <- rep(NA,length(transient_states))
   for (i in 1:length(transient_states)){
-    min_dists[i] <- min(dists[transient_states[i],initial_states])
+    m_dists[i] <-  max(dists[transient_states[i],],na.rm=T) #min(dists[transient_states[i],initial_states],na.rm=T)
   }
-  state_num$order[which(state_num$state %in% transient_states)] <- order(min_dists)+max(state_num$order,na.rm=T)
+  state_num$order[which(state_num$state %in% transient_states)] <- order(m_dists)+max(state_num$order,na.rm=T)
+  state_num$type[which(state_num$state %in% transient_states)] <- "trans"
   
   state_num$order[which(state_num$state %in% absorbing_states)] <- (k-1-length(absorbing_states)+1):(k-1)
+  state_num$type[which(state_num$state %in% absorbing_states)] <- "abs"
   return(state_num)
 }
 
-
-## 2.2 Keep only relevant timepoints
-## Input: data_set (the dataset to consider), graph (the graph)
+#' Filter away redundant observations in a multi-state dataset
+#' 
+#' Only the last timepoint in initial states are relevant. Only the first timepoint in absorbing states. For the
+#' transient states the first and last timepoints are relevant.
+#'
+#' @param data_set A data frame with 3 columns: patient (numbering or names for each patient), time (the time when a patient was observed),
+#' state (the state which the patient occupies at the observation time).
+#' @param graph A directed, acyclic graph in the igraph format (igraph package).
+#' @return A data frame with the same 3 columns as data_set, but with fewer rows (potentially).
+#' 
 relevant_timepoints = function(data_set, graph){
   inds = unique(data_set$patient)
   nn = length(inds)
   ddr = data_set
-  states_in_dataset = as.numeric(state_ordering(graph)[,1]) 
-  all_states_ordered = as.numeric(state_ordering(graph)[,2])
-  for(j in 1:length(states_in_dataset)){
-    ddr$state = replace(ddr$state, which(ddr$state == states_in_dataset[j]), all_states_ordered[j])
-  }
+  # Add state ordering instead of state names
+  state_ord = state_ordering(graph)
+  ddr$state = with(state_ord, order[match(ddr$state, state)])
+
+  # Identify initial and absorbing states
+  init <- state_ord$order[which(state_ord$type=="init")]
+  trans <- state_ord$order[which(state_ord$type=="trans")]
+  abs <- state_ord$order[which(state_ord$type=="abs")]
+  dists <- distances(graph,mode="in")
+  
   idd = NULL
   for (i in 1:nn){
-    ddi = data_set[which(data_set$patient==inds[i]),]
-    states = ddi$state
-    ddi$state = states
-    rlei = matrix(0,2,length(all_states_ordered))
-    rlei[1,] = all_states_ordered
-    rlei[2, (rle(states)$values)] = rle(states)$lengths
+    ddi = ddr[which(ddr$patient==inds[i]),]
+    
+    # If the patient does not start in an initial state - add the appropriate initial state at time=0 (if the initial state is not 
+    # uniquely defined one just has to add one of the initial states)
+    if (sum(ddi$state %in% init)==0){
+      min_state <- state_ord$state[which(state_ord$order==min(ddi$state))]
+      id_init <- which.min(dists[min_state,-which(colnames(dists)==min_state)])[1]
+      ddi_1 <- c(ddi$patient[i],0,state_ord$order[which(state_ord$state==names(id_init))])
+      ddi <- rbind(ddi_1,ddi)
+      ddr <- rbind(ddi,ddr[-which(ddr$patient==inds[i]),])
+    }
+    
+    # Identify redundant timepoints
+    rle_i <- rle(ddi$state)
     id_unrelevant = NULL
-    for(j in 1:ncol(rlei)){
-      if(j == 1 & rlei[2,j] >= 2){
-        id_unrelevant = 1:(rlei[2,j]-1)
-      } else if(j > 1 & j < ncol(rlei) & rlei[2,j] >= 3){
-        id_unrelevant = c(id_unrelevant,(sum(rlei[2,1:(j-1)])+2):(sum(rlei[2,1:j])-1))
-      } else if(j == ncol(rlei) & rlei[2,j] >= 2){
-        id_unrelevant = c(id_unrelevant,(sum(rlei[2,1:(j-1)])+2):sum(rlei[2,1:j]))
+    for(j in 1:length(rle_i$values)){
+      val <- rle_i$values[j]
+      num <- rle_i$lengths[j]
+      if(val%in%init & num >= 2){ #initial states
+        id_unrelevant = which(ddi$state==val)[1:(num-1)]  # assumes that the timepoints are sorted?
+      } else if(val%in%trans & num >= 3){ #transient states
+        id_unrelevant = c(id_unrelevant,which(ddi$state==val)[-c(1,num)])
+      } else if(val%in%abs & num >= 2){ #absorbing states
+        id_unrelevant = c(id_unrelevant,which(ddi$state==val)[2:num])
       }
     }
     idd = c(idd,which(ddr$patient==inds[i])[id_unrelevant])
