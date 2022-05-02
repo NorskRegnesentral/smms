@@ -102,77 +102,71 @@ relevant_timepoints = function(data_set, graph){
   return(ddr)
 }
 
-
-## 2.3 Construct formula types
-## Input: graph (the graph)
+#' Find all formula types
+#' 
+#' The formula types are the combination of states a patient can be last observed in and possible paths from
+#' the initial states to these “last observed” states. The list of states is the path actually traveled by the patient,
+#' but some of the transient state might actually be unobserved.
+#'
+#' @param graph A directed, acyclic graph in the igraph format (igraph package).
+#' @return A vector with string elements indicating the states that were visited/traveled.
+#' 
 construct_formula_types = function(graph){
-  ## Tranforming the graph to the "new" states
-  state_start = min(as.numeric(state_ordering(graph)[,2]))
-  state_end = max(as.numeric(state_ordering(graph)[,2]))
-  subsets = matrix(nrow = 0, ncol = 2)
-  for(i in 1:length(state_start)){
-    for(j in 1:length(state_end)){
-      #subsets_expand_grid = expand.grid(state_start[i], c(state_start[i]:state_end[j]))
-      subsets = rbind(subsets, expand.grid(state_start[i], c(state_start[i]:state_end[j])))
-    }
-  }
+  state_ord = state_ordering(graph)
+  init <- state_ord$order[which(state_ord$type=="init")]
+  trans <- state_ord$order[which(state_ord$type=="trans")]
+  abs <- state_ord$order[which(state_ord$type=="abs")]
   
-  ## The ordering of V(graph) can be different from state_ordering
-  new_graph_name = c()
-  for(i in 1:nrow(state_ordering(graph))){
-    r = match(V(graph)$name[i], state_ordering(graph)[,1])
-    new_graph_name = c(new_graph_name, state_ordering(graph)[r,2])
-  }
-  V(graph)$name = new_graph_name
+  k <- dim(state_ord)[1]
   
-  characters_subset_vector = NULL
+  ## Find all combination of initial states and other states
+  subsets = matrix(nrow = length(init)*k, ncol = 2)
+  subsets[,1] <- rep(init,each=k)
+  subsets[,2] <- rep(c(init,trans,abs),times=length(init))
+  
+  ## Determine which subsets containt none, one or multiple paths
   form_types = c()
   for(p in 1:nrow(subsets)){
-    ## Which list of possible combination we consider
-    characters_subset_matrix = matrix(NA, ncol = ncol(subsets), nrow = nrow(subsets))
-    ## Make the states into characters in order to use all_simple_paths
-    for(i in 1:ncol(subsets)){
-      characters_subset_vector[i] = as.character(subsets[p, i])
-    }
-    subset_size = all_simple_paths(graph, characters_subset_vector[1], 
-                                   characters_subset_vector[ncol(subsets)])
+    paths = all_simple_paths(graph, state_ord$state[which(state_ord$order==subsets[p,1])], 
+                             state_ord$state[which(state_ord$order==subsets[p,2])])
     ## If only observed in initial state
-    if(length(subset_size) == 0){
-      form_types = c(form_types, as.character(subsets[p, 1])) #characters_subset_matrix[p,1])
+    if(length(paths) == 0){
+      form_types = c(form_types, as.character(subsets[p, 1])) 
     } else{ ## For all the other possible roads to travel
-      for(i in 1:length(subset_size)){
-        data_frame_subset_type_as_char = paste(as.data.frame(t(sapply(subset_size[i], as_ids))), collapse = "")
+      for(i in 1:length(paths)){
+        st = sort(state_ord$order[which(state_ord$state%in%as_ids(paths[[i]]))])
+        data_frame_subset_type_as_char = paste(st, collapse = "")
         form_types = c(form_types, data_frame_subset_type_as_char)
       }
     }
   }
+  form_types = unique(form_types)
   return(form_types)
 }
 
 
-## 2.4 Find observation times
-## Input: graph (the graph)
+#' Find all observation types
+#' 
+#' The observation types are the combination of states in which a patient can 
+#' actually observed. It does not necessarily indicate which path was traveled:
+#' some observation types may correspond to multiple paths.
+#'
+#' @param graph A directed, acyclic graph in the igraph format (igraph package).
+#' @return A vector with string elements indicating the states in which the patient is observed.
+#' 
 construct_obs_types = function(graph){
-  ## Finding the initial state
-  all_edges = get.edgelist(graph)
-  all_initial = which(!(all_edges[,1] %in% all_edges[,2]))
-  initial_state = unique(sapply(1:length(all_initial), function(r) all_edges[r,1]))
-  
-  num_states = length(as.numeric(state_ordering(graph)[,2]))
-  num_init = length(initial_state)
-  states = 0:(num_states-1) # assumes that the states are enumerated from 0 to k, with the initial state in the beginning
-  num_obs_types = num_init + num_init*sum(choose((num_states-num_init),1:(num_states-num_init)))
-  obs_types = rep(NA,num_obs_types)
-  obs_types[1:num_init] = states[1:num_init]
-  states_rest = states[-(1:num_init)]
-  ii = which(is.na(obs_types))[1]
-  for (i in 1:length(states_rest)){
-    mat = matrix(0,(i+num_init),choose((num_states-num_init),i))
-    mat[-1,] = combn(states_rest,i)    # here I've assumed a single initial state (FIX later)
-    otypes = apply(mat,2,paste,collapse="")
-    obs_types[ii:(ii+length(otypes)-1)] = otypes
-    ii = ii+length(otypes)
+  form_types = construct_formula_types(graph)
+  obs_types = c()
+  for (i in 1:length(form_types)){
+    st = strsplit(form_types[i],"")[[1]]
+    obs_types = c(obs_types,form_types[i])
+    if (length(st)>2){
+      ot = sapply(2:(length(st)-1), function(r) combn(st[1:length(st)],r),simplify=F)
+      ot = lapply(ot,function(m) m[,which(m[1,]==st[1])])
+      obs_types = c(obs_types,unlist(lapply(ot,function(m) apply(m,2,paste,collapse=""))))
+    }
   }
+  obs_types = unique(obs_types)
   return(obs_types)
 }
 
