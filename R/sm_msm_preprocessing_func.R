@@ -50,7 +50,7 @@ state_ordering = function(graph){
 #' @param graph A directed, acyclic graph in the igraph format (igraph package).
 #' @return A data frame with the same 3 columns as 'data', but with fewer rows (potentially).
 #'
-relevant_timepoints = function(formula,subject,data, graph){
+relevant_timepoints = function(data, graph){
   inds = unique(data$patient)
   nn = length(inds)
   ddr = data
