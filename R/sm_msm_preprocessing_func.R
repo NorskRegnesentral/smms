@@ -25,14 +25,31 @@ state_ordering = function(graph){
 
   # For the transient states (not initial or absorbing):
   # the ones on the same path should be ordered according to distance from the initial state
-  dists <- distances(graph,mode="in")
-  dists[which(is.infinite(dists))] <- NA
+  # intuition: the ordering of the transient states must be such that all edge pairs go from a lower number to a higher number
   transient_states <-  state_num$state[-which(state_num$state %in% initial_states | state_num$state %in% absorbing_states)]
+  transient_edges <- all_edges[which(all_edges[,1] %in% transient_states & all_edges[,2] %in% transient_states),,drop=F]
   m_dists <- rep(NA,length(transient_states))
-  for (i in 1:length(transient_states)){
-    m_dists[i] <-  max(dists[transient_states[i],],na.rm=T) #min(dists[transient_states[i],initial_states],na.rm=T)
+  names(m_dists) <- transient_states
+  low <- unique(transient_edges[which(!(transient_edges[,1] %in% transient_edges[,2])),1])
+  high <- unique(transient_edges[which(!(transient_edges[,2] %in% transient_edges[,1])),2])
+  m_dists[low] <- 1
+  m_dists[high] <- length(transient_states)
+  
+  mid <-  unique(transient_edges[-which(transient_edges %in% low | transient_edges %in% high)])
+  if (length(mid)==1) m_dists[mid] <- 2
+  ii <- 2
+  while(length(mid)>1){
+    mid_edges <- transient_edges[which(transient_edges[,1] %in% mid & transient_edges[,2] %in% mid),,drop=F]
+    low <- unique(mid_edges[which(!(mid_edges[,1] %in% mid_edges[,2])),1])
+    high <- unique(mid_edges[which(!(mid_edges[,2] %in% mid_edges[,1])),2])
+    m_dists[low] <- ii
+    m_dists[high] <- length(transient_states)-ii+1
+    ii <- ii+1
+    
+    mid <-  unique(mid_edges[-which(mid_edges %in% low | mid_edges %in% high)])
+    if (length(mid)==1) m_dists[mid] <- ii
   }
-  state_num$order[which(state_num$state %in% transient_states)] <- order(m_dists)+max(state_num$order,na.rm=T)
+  state_num$order[which(state_num$state %in% transient_states)] <- rank(m_dists,ties.method="first")+max(state_num$order,na.rm=T)
   state_num$type[which(state_num$state %in% transient_states)] <- "trans"
 
   state_num$order[which(state_num$state %in% absorbing_states)] <- (k-1-length(absorbing_states)+1):(k-1)
@@ -50,7 +67,7 @@ state_ordering = function(graph){
 #' @param graph A directed, acyclic graph in the igraph format (igraph package).
 #' @return A data frame with the same 3 columns as 'data', but with fewer rows (potentially).
 #'
-relevant_timepoints = function(formula,subject,data, graph){
+relevant_timepoints = function(data, graph){
   inds = unique(data$patient)
   nn = length(inds)
   ddr = data
@@ -200,182 +217,111 @@ all_types = function(graph){
   return(matrix_all_types)
 }
 
-
-## 2.6 Arrange data
-## Input: data (the dataset to consider), graph (the graph)
-arrange_data = function(data, graph, abs_int_cens = NULL){
-  ## Finding the initial, transient and absorbing states - in the "new" format with 0, 1, ...
-  all_edges = get.edgelist(graph)
-  all_initial = which(!(all_edges[,1] %in% all_edges[,2]))
-  initial_state = unique(sapply(all_initial, function(p) all_edges[p,1]))
-  all_absorbing = which(!(all_edges[,2] %in% all_edges[,1]))
-  absorbing_state = unique(sapply(all_absorbing, function(p) all_edges[p,2]))
-
-  all_states_old = state_ordering(graph)[,1]
-  all_states_new = state_ordering(graph)[,2]
-
-  row_initial = sapply(1:length(initial_state), function(p) which(all_states_old == initial_state[p], arr.ind = TRUE))
-  row_absorbing = sapply(1:length(absorbing_state), function(p) which(all_states_old == absorbing_state[p], arr.ind = TRUE))
-
-
-  transient_state_new = c()
-  for(p in 1:length(all_states_old)){
-    if(!(all_states_old[p] %in% absorbing_state) & !(all_states_old[p] %in% initial_state)){
-      transient_state_new  = c(transient_state_new, all_states_new[p])
-    }
-  }
-  initial_state_new = sapply(row_initial, function(p) state_ordering(graph)[p,2])
-  absorbing_state_new = sapply(row_absorbing, function(p) state_ordering(graph)[p,2])
-
-
-  if(!is.null(abs_int_cens)){
-    row_absorbing = sapply(1:length(absorbing_state), function(p) which(all_states_old == absorbing_state[p], arr.ind = TRUE))
-    absorbing_state_int_cens = sapply(row_absorbing, function(p) state_ordering(graph)[p,2])
-    absorbing_state_r_cens = which(!(absorbing_state_new %in% absorbing_state_int_cens))
-  }
-
+#' Arrange data set
+#'
+#' Discard unrelevant time-points and arrange data into one row per patient format. The column names for the relevant time-points
+#' are on the format t_{im}/t_{iM}, where i is the state numbering according to state_ordering() and m/M indicate the minimum and maximum 
+#' time-point in each state. For initial states only the maximum time-point is relevant, and for absorbing states only the minimum.
+#'
+#' @param data A data frame with 3 columns: patient (numbering or names for each patient), time (the time when a patient was observed),
+#' state (the state which the patient occupies at the observation time).
+#' @param graph A directed, acyclic graph in the igraph format (igraph package).
+#' @return A data frame with as many rows as there are patients and with one column per relevant time-point pluss one column indicating 
+#' the observation type of each patient.
+#'
+#'
+arrange_data = function(data, graph){
+  state_ord = state_ordering(graph)
+  init <- sort(state_ord$order[which(state_ord$type=="init")])
+  trans <- sort(state_ord$order[which(state_ord$type=="trans")])
+  abs <- sort(state_ord$order[which(state_ord$type=="abs")])
 
   ## Back to the timepoints - making an empty matrix with correct time points
   ddr = relevant_timepoints(data, graph)
   inds = unique(ddr$patient)
   nn = length(inds)
-  if(is.null(abs_int_cens)){
-    timepoints = matrix(NA,nn,length(initial_state) + length(absorbing_state) + 2*length(transient_state_new) +1)
-    names_middle = paste(rep("t", length(initial_state) + 2*length(transient_state_new) + length(absorbing_state)),
-                         c(initial_state_new, rep(transient_state_new,each = 2), absorbing_state_new),
-                         c("M",rep(c("m","M"),length(transient_state_new)),rep("m",length(absorbing_state))), sep="")
-    ### C has fixed above
-
-  } else{
-    timepoints = matrix(NA,nn,length(initial_state) + length(absorbing_state)- length(abs_int_cens) + 2*length(transient_state_new)+2*length(abs_int_cens) +1)
-    names_middle = paste(rep("t", length(initial_state) + 2*length(transient_state_new) + 2*length(abs_int_cens) + length(absorbing_state_new)-length(abs_int_cens)),
-                         c(initial_state_new, rep(transient_state_new,each = 2), rep(abs_int_cens, each = 2), absorbing_state_r_cens),
-                         rep(c("M", "m"),
-                             (length(initial_state) + 2*length(transient_state_new) + 2*length(absorbing_state_int_cens) + length(absorbing_state_r_cens))/2), sep="")
-  }
+  timepoints = as.data.frame(matrix(NA,nn,length(init) + length(abs) + 2*length(trans) +1))
+  names_middle = paste(rep("t", length(init) + length(abs) + 2*length(trans)),
+                       c(init, rep(trans,each = 2), abs),
+                       c(rep("M",length(init)),rep(c("m","M"),length(trans)),rep("m",length(abs))), sep="")
   colnames(timepoints) = c(names_middle, "obs_type")
 
-  if(is.null(abs_int_cens)){
-    ## Filling out the timepoints matrix
-    otypes = rep(NA,nn) # a vector indicating the observation type of each patient
-    for (i in 1:nn){
-      ddi = ddr[which(ddr$patient==inds[i]),]
-      tti = ddi$time[pmatch(c(initial_state_new, rep(transient_state_new, each = 2),
-                               absorbing_state_new),ddi$state)]
-      names(tti) = as.character(c(initial_state_new, rep(transient_state_new, each = 2),
-                                  absorbing_state_new),ddi$state)
-
-      for(j in 2:length(tti)){
-        ## If the initial state(s) column number is odd/even, then all the "M"'s are also odd/even.
-        ## It is the "M"'s which potentially are NA. Do not want to fill them if both are NA
-        if((length(initial_state) %% 2) == (j %% 2) & j > length(initial_state) &
-           j <= (length(initial_state) + 2*length(transient_state_new))){
-          if (is.na(tti[j]) & !is.na(tti[j-1])){
-            tti[j] = tti[j-1]
-          }
-        }
-      }
-      timepoints[i,1:(ncol(timepoints)-1)] = tti
-      ## Which observed type the individual is
-      timepoints[i, ncol(timepoints)] = paste(unique(names(tti[!(is.na(tti))])), collapse ="")
-    }
-  } else{
-    ## Filling out the timepoints matrix
-    otypes = rep(NA,nn) # a vector indicating the observation type of each patient
-    for (i in 1:nn){
-      ddi = ddr[which(ddr$patient==inds[i]),]
-      tti = ddi$time[pmatch(c(initial_state_new, rep(transient_state_new, each = 2),
-                               rep(absorbing_state_int_cens, each = 2), absorbing_state_r_cens),ddi$state)]
-      names(tti) = as.character(c(initial_state_new, rep(transient_state_new, each = 2),
-                                  rep(absorbing_state_int_cens, each = 2), absorbing_state_r_cens),ddi$state)
-
-      for(j in 2:length(tti)){
-        ## If the initial state(s) column number is odd/even, then all the "M"'s are also odd/even.
-        ## It is the "M"'s which potentially are NA. Do not want to fill them if both are NA
-        if((length(initial_state) %% 2) == (j %% 2) & j > length(initial_state) &
-           j <= (length(initial_state) + 2*length(transient_state_new) + 2*length(absorbing_state_int_cens))){
-          if (is.na(tti[j]) & !is.na(tti[j-1])){
-            tti[j] = tti[j-1]
-          }
-        }
-      }
-      timepoints[i,1:(ncol(timepoints)-1)] = tti
-      ## Which observed type the individual is
-      timepoints[i, ncol(timepoints)] = paste(unique(names(tti[!(is.na(tti))])), collapse ="")
-    }
+  ## Filling out the timepoints matrix
+  for (i in 1:nn){
+    ddi = ddr[which(ddr$patient==inds[i]),]
+    tti = ddi$time[pmatch(c(init, rep(trans, each = 2),abs),ddi$state)]
+    names(tti) = as.character(c(init, rep(trans, each = 2),abs),ddi$state)
+    
+    # For transient states where only a single time-point has been observed, the second 
+    # time-point is set equal to the first t_{im}=t_{iM}
+    id_dupl <- which(names(tti) %in% trans & duplicated(names(tti)) & is.na(tti))
+    tti[id_dupl] <- tti[id_dupl-1]
+    
+    timepoints[i,1:(ncol(timepoints)-1)] = tti
+    ## Which observed type the individual is
+    timepoints[i, ncol(timepoints)] = paste(unique(names(tti[!(is.na(tti))])), collapse ="")
   }
-
   return(timepoints)
 }
 
-
-## 2.7 Make edge matrices
-## Input: graph (the graph)
+#' Make edge matrices
+#'
+#'Make three matrices with the formula types as rows, and edges in the graph as columns. For each formula type, 
+#'non-zero numbers indicate that edges have been "travelled", or "passed by", or if they are "possible next", 
+#'meaning that they may be travelled in the next step. The non-zero numbers also indicate in what order the 
+#'edges have been encountered. Zeros indicate edges that were not travelled/passed by/ possible next.
+#'
+#' @param graph A directed, acyclic graph in the igraph format (igraph package).
+#' @return A list of three matrices: travelled, passedBy, and possible next.
+#'
+#'
 edge_matrices = function(graph){
-  ## Make a duplicate to not change the original graph
-  graph2 = graph
-  ## The ordering of V(graph) can be different from state_ordering
-  new_graph_name = c()
-  for(i in 1:nrow(state_ordering(graph2))){
-    r = match(V(graph2)$name[i], state_ordering(graph2)[,1])
-    new_graph_name = c(new_graph_name, state_ordering(graph2)[r,2])
+  all_edges = get.edgelist(graph)
+  # Update with state ordering as node names:
+  state_ord = state_ordering(graph)
+  for (i in 1:dim(state_ord)[1]){
+    all_edges=gsub(state_ord$state[i],as.character(state_ord$order[i]),all_edges)
   }
-  V(graph2)$name = new_graph_name
-  data_frame_possible_travels = get.data.frame(graph2, what= "edges" )
-
-  ## Make all of the possible travels into characters
-  data_frame_travels = c()
-  for(i in 1:nrow(data_frame_possible_travels)){
-    data_frame_travels = c(data_frame_travels, paste(data_frame_possible_travels[i,], collapse = ""))
-  }
+  edge_names = apply(all_edges,1,paste,collapse="")
+  
   formula_types = construct_formula_types(graph)
 
   ## Make a matrix for all the edges traveled
-  matrix_travelled = matrix(data = 0, nrow = length(formula_types), ncol = length(data_frame_travels))
+  matrix_travelled = matrix(data = 0, nrow = length(formula_types), ncol = length(edge_names))
   rownames(matrix_travelled) = formula_types
-  colnames(matrix_travelled) = data_frame_travels
+  colnames(matrix_travelled) = edge_names
   for(i in 1:length(formula_types)){
-    formula_types_split = unlist(strsplit(formula_types[i], ""))
-    for(j in 1:nrow(data_frame_possible_travels)){
-      for(p in 1:(length(formula_types_split)-1)){
-        if(length(formula_types_split) > 1){
-          if(formula_types_split[p] == data_frame_possible_travels[j, 1] &
-             formula_types_split[p+1] == data_frame_possible_travels[j, 2]){
-            matrix_travelled[i, j] = length(0:formula_types_split[p])
-          }
-        }
-      }
-    }
+    formula_str_pairs = substring(formula_types[i], first = 1:(nchar(formula_types[i]) - 1), last = 2:nchar(formula_types[i]))
+    matches = which(edge_names %in% formula_str_pairs)
+    matches_order = match(edge_names[matches],formula_str_pairs)
+    if (length(matches)==0) next
+    matrix_travelled[i,matches] <- matches_order
   }
 
-  ## Make a matrix for all the edges which potentially can be traveled
-  matrix_possible_to_travel = matrix(data = 0, nrow = length(formula_types), ncol = length(data_frame_travels))
-  rownames(matrix_possible_to_travel) = formula_types
-  colnames(matrix_possible_to_travel) = data_frame_travels
+  ## Make a matrix for all the edges which potentially can be traveled (in the next step)
+  matrix_possible_next = matrix(data = 0, nrow = length(formula_types), ncol = length(edge_names))
+  rownames(matrix_possible_next) = formula_types
+  colnames(matrix_possible_next) = edge_names
   for(i in 1:length(formula_types)){
     formula_types_split = unlist(strsplit(formula_types[i], ""))
-    for(j in 1:nrow(data_frame_possible_travels)){
-      if(formula_types_split[length(formula_types_split)] == data_frame_possible_travels[j, 1]){
-        matrix_possible_to_travel[i, j] = length(formula_types_split)
-      }
-    }
+    id_next <- which(all_edges[,1]==formula_types_split[length(formula_types_split)])
+    if (length(id_next)==0) next
+    matrix_possible_next[i,id_next] <- length(formula_types_split)
   }
 
-  ## Make a matrix for all the edges which were not traveled
-  matrix_did_not_travel = matrix(data = 0, nrow = length(formula_types), ncol = length(data_frame_travels))
-  rownames(matrix_did_not_travel) = formula_types
-  colnames(matrix_did_not_travel) = data_frame_travels
+  ## Make a matrix for all the edges which were not traveled (i.e. where passed by)
+  matrix_passed = matrix(data = 0, nrow = length(formula_types), ncol = length(edge_names))
+  rownames(matrix_passed) = formula_types
+  colnames(matrix_passed) = edge_names
   for(i in 1:length(formula_types)){
-    formula_types_split = unlist(strsplit(formula_types[i], ""))
-    for(j in 1:nrow(data_frame_possible_travels)){
-      for(p in 1:(length(formula_types_split)-1)){
-        if(length(formula_types_split) > 1)
-          if(formula_types_split[p] == data_frame_possible_travels[j, 1] & formula_types_split[p+1] != data_frame_possible_travels[j, 2]){
-            matrix_did_not_travel[i, j] = length(0:formula_types_split[p])
-          }
-      }
+    formula_str_pairs = substring(formula_types[i], first = 1:(nchar(formula_types[i]) - 1), last = 2:nchar(formula_types[i]))
+    for (j in 1:length(formula_str_pairs)){
+      pair_split = unlist(strsplit(formula_str_pairs[j], ""))
+      match_passed = which(pair_split[1]==all_edges[,1] & pair_split[2]!=all_edges[,2])
+      if (length(match_passed)==0) next
+      matrix_passed[i,match_passed] = j
     }
   }
-  list_all_edges = list("traveled" = matrix_travelled , "passedBy" = matrix_did_not_travel, "possible" = matrix_possible_to_travel)
+  list_all_edges = list("traveled" = matrix_travelled , "passedBy" = matrix_passed, "possible" = matrix_possible_next)
   return(list_all_edges)
 }
