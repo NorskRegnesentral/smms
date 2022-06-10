@@ -9,16 +9,17 @@ names_of_survial_density = function(gg){
   all_transitions = state_ordering(gg)
   data_frame_possible_travels
   all_transitions
-  matrix_names = matrix(ncol = 5, nrow = nrow(data_frame_possible_travels))
-  colnames(matrix_names) = c("survival_name", "density_name", "from_prev", "to_prev", "all_transitions")
+  matrix_names = matrix(ncol = 6, nrow = nrow(data_frame_possible_travels))
+  colnames(matrix_names) = c("survival_name", "density_name", "from_prev", "to_prev", "all_transitions", "type")
   for(i in 1:nrow(data_frame_possible_travels)){
-    kk_from = which(all_transitions[, "prev"] %in% data_frame_possible_travels[i, "from"]) 
-    kk_to = which(all_transitions[, "prev"] %in% data_frame_possible_travels[i, "to"])
-    matrix_names[i, "survival_name"] = paste(c("S_", all_transitions[kk_from, "new"], all_transitions[kk_to, "new"]), collapse = "")
-    matrix_names[i, "density_name"] = paste(c("f_", all_transitions[kk_from, "new"], all_transitions[kk_to, "new"]), collapse = "")
-    matrix_names[i, "from_prev"] = all_transitions[kk_from, "prev"]
-    matrix_names[i, "to_prev"] = all_transitions[kk_to, "prev"]
-    matrix_names[i, "all_transitions"] = paste(c(all_transitions[kk_from, "new"], all_transitions[kk_to, "new"]), collapse = "")
+    kk_from = which(all_transitions[, "state"] %in% data_frame_possible_travels[i, "from"]) 
+    kk_to = which(all_transitions[, "state"] %in% data_frame_possible_travels[i, "to"])
+    matrix_names[i, "survival_name"] = paste(c("S_", all_transitions[kk_from, "order"], all_transitions[kk_to, "order"]), collapse = "")
+    matrix_names[i, "density_name"] = paste(c("f_", all_transitions[kk_from, "order"], all_transitions[kk_to, "order"]), collapse = "")
+    matrix_names[i, "from_prev"] = all_transitions[kk_from, "state"]
+    matrix_names[i, "to_prev"] = all_transitions[kk_to, "state"]
+    matrix_names[i, "all_transitions"] = paste(c(all_transitions[kk_from, "order"], all_transitions[kk_to, "order"]), collapse = "")
+    matrix_names[i, "type"] = all_transitions[kk_to, "type"]
   }
   return(matrix_names)
 }
@@ -75,8 +76,10 @@ type_to_integrand_absExact = function(type,edge_mats,edge_abs){
   passi <- edge_mats$passedBy[type,]
   posi <- edge_mats$possible[type,]
   
-  density_names <- c("f_01","f_03","f_12","f_13","f_23") #make as input, should be sorted in the same way as columns in edge mats
-  surv_names <- c("S_01","S_03","S_12","S_13","S_23") #should be sorted in the same way as columns in edge mats
+  density_names <- names_of_survial_density(gg)[,"density_name"]
+  #c("f_01","f_03","f_12","f_13","f_23") #make as input, should be sorted in the same way as columns in edge mats
+  surv_names <- names_of_survial_density(gg)[,"survival_name"]
+  #c("S_01","S_03","S_12","S_13","S_23") #should be sorted in the same way as columns in edge mats
   
   # Write variable calls
   dim_integral <- max(travi)
@@ -170,8 +173,10 @@ type_to_integrand_absExact_v2 = function(type,edge_mats,edge_abs){
   passi <- edge_mats$passedBy[type,]
   posi <- edge_mats$possible[type,]
   
-  density_names <- c("f_01","f_03","f_12","f_13","f_23") #make as input, should be sorted in the same way as columns in edge mats
-  surv_names <- c("S_01","S_03","S_12","S_13","S_23") #should be sorted in the same way as columns in edge mats
+  density_names <- names_of_survial_density(gg)[,"density_name"]
+  #c("f_01","f_03","f_12","f_13","f_23") #make as input, should be sorted in the same way as columns in edge mats
+  surv_names <- names_of_survial_density(gg)[,"survival_name"]
+  #c("S_01","S_03","S_12","S_13","S_23") #should be sorted in the same way as columns in edge mats
   
   # Write variable calls
   dim_integral <- max(travi)
