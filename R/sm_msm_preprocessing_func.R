@@ -279,9 +279,8 @@ edge_matrices = function(graph){
   all_edges = get.edgelist(graph)
   # Update with state ordering as node names:
   state_ord = state_ordering(graph)
-  for (i in 1:dim(state_ord)[1]){
-    all_edges=gsub(state_ord$state[i],as.character(state_ord$order[i]),all_edges)
-  }
+  all_edges[,1] <- state_ord$order[match(all_edges[,1],state_ord$state)]
+  all_edges[,2] <- state_ord$order[match(all_edges[,2],state_ord$state)]
   edge_names = apply(all_edges,1,paste,collapse="")
   
   formula_types = construct_formula_types(graph)
