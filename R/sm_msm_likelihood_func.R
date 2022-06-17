@@ -36,7 +36,7 @@ names_of_survival_density = function(graph){
 #' Write out the integrand as a string
 #'
 #' For a given formula type the appropriate integrand is generated as a text string. The integrand
-#' takes the form of an R type function.
+#' takes the form of an R type function. For now this function is limited to integrals up to dimension 5.
 #'
 #' @param form_type A formula type (as a string).
 #' @param edge_mats A list with 3 matrices produced by the edge_matrices() function.
@@ -46,9 +46,6 @@ names_of_survival_density = function(graph){
 #' exactly (TRUE) or not (FALSE). Default value is TRUE.
 #' @return A text string giving the R syntax of the integrand.
 #'
-# this version of the function is for datasets (or observations) where the time into absorbing state 
-# is observed exactly
-# for now it is limited to integrals of dimension 3 (but can be extended)
 type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE){
   
   travi <- edge_mats$traveled[form_type,]
@@ -62,14 +59,13 @@ type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE)
   # Determine the integral dimension
   dim_integral <- max(travi)
   intoAbs <- names(travi)[which.max(travi)] %in% edge_abs
+  choice <- (length(which(passi==max(travi)))>0)   #TRUE: if absorbing state is reached from a state where there was an option to go a different way
   if (intoAbs){
-    choice <- (length(which(passi==max(travi)))>0)   #TRUE: if absorbing state is reached from a state where there was an option to go a different way
-    
     if(abs_exact==TRUE) dim_integral <- dim_integral-1
     if (abs_exact==FALSE & choice==FALSE) dim_integral <- dim_integral-1
   } 
   
-  variable_names <- c("ss","uu","rr","vv")
+  variable_names <- c("ss","uu","rr","vv","ww")
   var_def <- rep(NA,dim_integral)
   
   if (dim_integral<=2 & dim_integral>0){  # here we write the integrand in the form which suits the integrate() function
@@ -83,7 +79,7 @@ type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE)
     
     
     # Write "travelled" functions
-    variable_names_eval <- c("ss","uu","rr","vv")
+    variable_names_eval <- c("ss","uu") #c("ss","uu","rr","vv","ww")
     n_trav <- sum(travi>0)
     if (intoAbs & abs_exact==TRUE){
       variable_names_eval[n_trav] <-  paste("tt-", paste0(variable_names_eval[1:(n_trav-1)],collapse="",sep="- "))
@@ -93,7 +89,7 @@ type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE)
       variable_names_eval[n_trav] <-  paste("tt-", paste0(variable_names_eval[1:(n_trav-1)],collapse="",sep="- "))
       variable_names_eval[n_trav] <- gsub('.{2}$', '', variable_names_eval[n_trav]) 
       
-      variable_names_eval2 <- c("ss","uu","rr","vv")
+      variable_names_eval2 <- c("ss","uu")
       variable_names_eval2[n_trav] <-  paste("tt2-", paste0(variable_names_eval[1:(n_trav-1)],collapse="",sep="- "))
       variable_names_eval2[n_trav] <- gsub('.{2}$', '', variable_names_eval2[n_trav]) 
     }
@@ -126,7 +122,7 @@ type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE)
     }
     
     # Write "possible" functions
-    variable_names_eval_pos <- c("tt","tt-ss","tt-uu-ss","tt-rr-uu-ss")
+    variable_names_eval_pos <- c("tt","tt-ss","tt-uu-ss") #,"tt-rr-uu-ss","tt-rr-uu-ss-vv")
     n_posi <- sum(posi>0)
     S_posi <- rep(NA,n_posi)
     if (n_posi>0){
@@ -166,20 +162,30 @@ type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE)
       var_def[i] <- paste(variable_names[i],"<-","times[",i,"]","\n",sep="")
     }
     
-    # If the absorbing state is reached (and we know exactly when): change the last one
-    # if (names(travi)[which.max(travi)] %in% edge_abs){
-    #   var_def[dim_integral+1] <- paste(variable_names[dim_integral],"<-","tt","\n",sep="")
-    # }
-    
     # Write "travelled" functions
-    variable_names_eval <- c("ss","uu-ss","rr-uu","vv-rr")
+    variable_names_eval <- c("ss","uu-ss","rr-uu","vv-rr","ww-vv","tt-ww")
     n_trav <- sum(travi>0)
-    if (names(travi)[which.max(travi)] %in% edge_abs)  variable_names_eval[n_trav] <- sub("^.{2}", "tt", variable_names_eval[n_trav])
+    if (intoAbs & abs_exact==TRUE){
+      variable_names_eval[n_trav] <- sub("^.{2}", "tt", variable_names_eval[n_trav])
+    }
+    if (intoAbs==TRUE & abs_exact==FALSE & choice==FALSE){
+      variable_names_eval[n_trav] <- sub("^.{2}", "tt", variable_names_eval[n_trav]) 
+      
+      variable_names_eval2 <- c("ss","uu-ss","rr-uu","vv-rr","ww-vv","tt-ww")
+      variable_names_eval2[n_trav] <- sub("^.{2}", "tt2", variable_names_eval[n_trav]) 
+    }
+
     f_trav <- rep(NA,n_trav)
     if (n_trav>0){
       for (i in 1:n_trav){
         f_trav[i] <- paste(density_names[which(travi==i)],"(param,x,",variable_names_eval[i],")","*")
       }
+    }
+    if (intoAbs==TRUE & abs_exact==FALSE & choice==FALSE){
+      f_trav[n_trav] <- paste("(",surv_names[which(travi==n_trav)],"(param,x,",variable_names_eval2[n_trav],")","-",
+                              surv_names[which(travi==n_trav)],"(param,x,",variable_names_eval[n_trav],"))*")
+      # this solution requires that if tt2=-1 (which is a value it should be given when not relevant), 
+      # the survival function S_23 will return 1
     }
     
     
@@ -231,6 +237,9 @@ type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE)
     
     # paste everything together
     f_intro <- "function(times,tt,param,x){"
+    if (intoAbs==TRUE & abs_exact==FALSE & choice==FALSE){
+      f_intro <- "function(times,tt,param,x,tt2=-1){" #perhaps tt2=NULL?
+    } 
     f_end <- "}"
     f_prod <- paste(paste(f_trav,collapse=""),paste(S_passed,collapse=""),paste(S_posi,collapse=""))
     ff <- paste(f_intro,paste(var_def,collapse=""),f_prod,f_end)
@@ -278,6 +287,7 @@ repintegrate <- function(innerfunc,tt,param,x,lower,upper){ #integrate over ss
 #' @param timepoints A named vector of relevant timepoints (belonging to a patient), i.e. a single
 #' row from the output of the arrange_data() function.
 #' @param form_type A formula type (as a string).
+#' @param edge_mats A list with 3 matrices produced by the edge_matrices() function.
 #' @param absorbing_states A vector denoting the absorbing states (in the ordered naming system).
 #' @param abs_exact A boolean indicating whether the time of entrance into absorbing states is observed
 #' exactly (TRUE) or not (FALSE). Default value is TRUE.
@@ -285,17 +295,36 @@ repintegrate <- function(innerfunc,tt,param,x,lower,upper){ #integrate over ss
 #' upper limits of integration, and "tmax" the last timepoint (in which the integrand often needs 
 #' to be evaluated).
 #' 
-# FIX function for abs_excat=FALSE
-finding_limits <- function(timepoints,form_type,absorbing_states,abs_exact=TRUE){
+# FIX function for abs_exact=FALSE
+finding_limits <- function(timepoints,form_type,edge_mats,absorbing_states,abs_exact=TRUE){
   splitted_f_type = unlist(strsplit(form_type, ""))
-  tmax = max(timepoints,na.rm=T) # for abs_exact==TRUE ## CHECK
   
   #unobs_states <- splitted_f_type[which(!(splitted_f_type %in% unlist(strsplit(obs_type,""))))]
   
-  if (splitted_f_type[length(splitted_f_type)] %in% absorbing_states){ #if patient is observed in absorbing state
-    dim_int <- length(splitted_f_type)-2 # for abs_exact==TRUE ## CHECK
+  choice <- (length(which(edge_mats$passedBy[form_type,]==max(edge_mats$traveled[form_type,])))>0)  #TRUE: if absorbing state is reached from a state where there was an option to go a different way
+  intoAbs <- splitted_f_type[length(splitted_f_type)] %in% absorbing_states
+  seclast <- timepoints[which(substr(names(timepoints),2,2)%in%splitted_f_type[length(splitted_f_type)-1])]
+  
+  if (intoAbs==TRUE){ #if patient is observed in absorbing state
+    if (abs_exact==TRUE){
+      dim_int <- length(splitted_f_type)-2 
+      tmax = c(max(timepoints,na.rm=T),-1)
+    }else{
+      if (choice==TRUE){
+        dim_int <- length(splitted_f_type)-1
+        tmax = c(max(timepoints,na.rm=T),-1)
+      }else{
+        dim_int <- length(splitted_f_type)-2
+        if(is.na(seclast[2])){
+          tmax = c(max(timepoints,na.rm=T),-1)
+        }else{
+          tmax = c(max(timepoints,na.rm=T),unlist(seclast[2]))
+        }
+      }
+    }
   }else{ #if patient has not reached absorbing state
-    dim_int <- length(splitted_f_type)-1 ## CHECK
+    dim_int <- length(splitted_f_type)-1 
+    tmax = c(max(timepoints,na.rm=T),-1)
   }
   
   if (dim_int==0){
@@ -378,18 +407,38 @@ mloglikelihood <-  function(param,integrand,limits, X = NULL,method1 = "hcubatur
       tmax <- unlist(limits[[i]][[j]]$tmax)
       
       if(length(lower) == 0){
-        lli[j] = integrand[[i]][[j]](times=1,tt = tmax, param = param, x = X[i,]) # the value of times does not matter
+        lli[j] = integrand[[i]][[j]](times=1,tt = tmax[1], param = param, x = X[i,]) # the value of times does not matter
       }else if(length(lower)>0){
         if(length(lower)<=2 ){
-          lli[j] = repintegrate(integrand[[i]][[j]],tt=tmax,lower=lower,upper = upper, param = param, x = X[i,])
+          lli[j] = repintegrate(integrand[[i]][[j]],tt=tmax[1],lower=lower,upper = upper, param = param, x = X[i,])
           
         }else if (length(lower)>2){
           if (length(unique(lower)) != length(lower)){
             lli[j] = cubintegrate(integrand[[i]][[j]], lower = lower,upper = upper, method = "divonne", maxEval = 500,
-                                  tt = tmax, param = param, x = X[i,])$integral
+                                  tt = tmax[1], param = param, x = X[i,])$integral
           }else if (length(unique(lower)) == length(lower)){
             lli[j] = cubintegrate(integrand[[i]][[j]], lower = lower,upper = upper,maxEval = 500,
-                                  method = method1, tt = tmax, param = param, x = X[i,])$integral
+                                  method = method1, tt = tmax[1], param = param, x = X[i,])$integral
+          }
+        }
+      }
+      
+      # In the case of abs_exact=FALSE, and entering absorbing state from node without choice:
+      if (tmax[2]!=-1){
+        if(length(lower) == 0){
+          lli[j] = integrand[[i]][[j]](times=1,tt = tmax[1], param = param, x = X[i,],tt2=tmax[2]) # the value of times does not matter
+        }else if(length(lower)>0){
+          if(length(lower)<=2 ){
+            lli[j] = repintegrate(integrand[[i]][[j]],tt=tmax[1],lower=lower,upper = upper, param = param, x = X[i,],tt2=tmax[2])
+            
+          }else if (length(lower)>2){
+            if (length(unique(lower)) != length(lower)){
+              lli[j] = cubintegrate(integrand[[i]][[j]], lower = lower,upper = upper, method = "divonne", maxEval = 500,
+                                    tt = tmax[1], tt2=tmax[2], param = param, x = X[i,])$integral
+            }else if (length(unique(lower)) == length(lower)){
+              lli[j] = cubintegrate(integrand[[i]][[j]], lower = lower,upper = upper,maxEval = 500,
+                                    method = method1, tt = tmax[1], tt2=tmax[2], param = param, x = X[i,])$integral
+            }
           }
         }
       }

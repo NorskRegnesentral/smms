@@ -76,7 +76,7 @@ smms = function(startval, data, graph, X = NULL, mc_cores = 3){
     integral_mellomregn= list()
     for(j in 1:length(f_types)){
       integrand_mellomregn[[j]] = eval(parse(text=type_to_integrand(f_types[j], edge_mats, names_surv_dens)))
-      integral_mellomregn[[j]] = finding_limits(timepointMat[i,],f_types[j],absorbing_states)
+      integral_mellomregn[[j]] = finding_limits(timepointMat[i,],f_types[j],edge_mats,absorbing_states)
     }
     all_integral_limits[[i]] = integral_mellomregn
     integrand[[i]] = integrand_mellomregn
