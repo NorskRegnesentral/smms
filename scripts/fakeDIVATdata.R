@@ -165,5 +165,6 @@ table(tMat_agg$states)
 aggregate(tMat_agg$mean_time,by=list(tMat_agg$states),FUN=mean)
 
 ### Fit true model
-ddt <- arrange_data(data.frame(tMat_full),gg)
+ddt <- arrange_data(data.frame(tMat_full),gg, abs_int_cens = NULL)
 table(ddt[,"obs_type"])
+
