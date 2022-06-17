@@ -71,4 +71,3 @@ optim_func = function(params, data_set, graph, X = NULL, mc_cores = 3){
                               all_integral_limits = all_integral_limits,mc_cores=mc_cores,X=X)
   return(list(optimizer, hessian_optimizer))
 }
-optim_func(params = params, dd, gg)
