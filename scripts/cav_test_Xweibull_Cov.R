@@ -259,26 +259,15 @@ lines(tval,p3_o1*100,col="#ca0020",lwd=3,lty=2)
 dev.off()
 
 
-#### Overall survival: needs to be reimplemented!
-S_total <- function(tt,param,x){
-  nn <- length(tt)
-  pp <- rep(NA,nn)
-  for (i in 1:nn){
-    pp[i] <- (S_01(param,x,tt[i])*S_03(param,x,tt[i]) + 
-                int1(f01_S12_S03_S13,teval=tt[i],param=param,x=x,tlim1=0,tlim2=tt[i],tlim1_l2=NA,tlim2_l2=NA) +
-                int1(f01_f12_S23_S03_S13,teval=tt[i],param=param,x=x,tlim1=0,tlim2=tt[i],tlim1_l2=0,tlim2_l2=tt[i])) 
-  }
-  return(pp)
-}
-
-tval <- seq(0,30,length=100)
-Sy0 <- S_total(tval,aa,c(-1,0))
-Sy1 <- S_total(tval,aa,c(-1,1))
-So0 <- S_total(tval,aa,c(1,0))
-So1 <- S_total(tval,aa,c(1,1))
+#### Overall survival: 
+tval <- seq(0.01,30,length=100)
+Sy0 <- overall_survival(tval,aa,gg,c(-1,0))
+Sy1 <- overall_survival(tval,aa,gg,c(-1,1))
+So0 <- overall_survival(tval,aa,gg,c(1,0))
+So1 <- overall_survival(tval,aa,gg,c(1,1))
 
 plot.survfit.msm(cav.msm, col.surv="black",lwd.surv=2,xlab="years after transplantation",
-                 ylab="survival",main=" ",legend.pos=None,col="#ca0020",lwd=3,covariates=list(dage_st=-1,ihdTRUE=0))
+                 ylab="survival",main=" ",legend.pos=None,col="grey",lwd=3,covariates=list(dage_st=-1,ihdTRUE=0))
 
 pdf("cav_weibull_cov_survival.pdf", width=11, height=7)
 par(mfrow=c(1,1))

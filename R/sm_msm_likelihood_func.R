@@ -290,14 +290,29 @@ change_integrand <- function(integr){
   int <- paste0(deparse(integr), collapse = " ")
   m <- regexpr("ss,.+tt,",int)
   call <- regmatches(int,m)
-  int <- sub("ss,.+tt,","times,tt,",int)
-  if (grepl("uu",call)){
-    int <- sub("\\{.+f_01","\\{\nss<-times[1]\nuu<-times[2]\nf_01",int)
-    int <- gsub(", uu",", uu-ss",int)
-    int <- gsub("tt - uu - ss","tt- uu",int)
-    int <- gsub("tt - ss - uu","tt- uu",int)
+  
+  if (grepl("tt2",call)){
+    int <- sub("ss,.+tt,","times,tt2=-1,tt,",int)
+    if (grepl("uu",call)){
+      int <- sub("\\{.+f_01","\\{\nss<-times[1]\nuu<-times[2]\nf_01",int)
+      int <- gsub(", uu",", uu-ss",int)
+      int <- gsub("tt - uu - ss","tt- uu",int)
+      int <- gsub("tt - ss - uu","tt- uu",int)
+      int <- gsub("tt2 - uu - ss","tt2- uu",int)
+      int <- gsub("tt2 - ss - uu","tt2- uu",int)
+    }else{
+      int <- sub("\\{.+f_01","\\{\nss<-times[1]\nf_01",int)
+    }
   }else{
-    int <- sub("\\{.+f_01","\\{\nss<-times[1]\nf_01",int)
+    int <- sub("ss,.+tt,","times,tt,",int)
+    if (grepl("uu",call)){
+      int <- sub("\\{.+f_01","\\{\nss<-times[1]\nuu<-times[2]\nf_01",int)
+      int <- gsub(", uu",", uu-ss",int)
+      int <- gsub("tt - uu - ss","tt- uu",int)
+      int <- gsub("tt - ss - uu","tt- uu",int)
+    }else{
+      int <- sub("\\{.+f_01","\\{\nss<-times[1]\nf_01",int)
+    }
   }
   return(eval(parse(text=int)))
 }

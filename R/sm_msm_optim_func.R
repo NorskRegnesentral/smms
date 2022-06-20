@@ -92,7 +92,7 @@ smms = function(startval, data, graph, X = NULL, mc_cores = 3){
 #optim_func(params = params, dd, gg)
 
 
-###################### Functions for occupancy probabilities ##############
+###################### Functions for diagnostic plots ##############
 
 
 #' Compute the occupancy probability over time
@@ -136,17 +136,27 @@ occupancy_prob = function(state, time, param, graph, xval = NULL){
     for (j in 1:kk){
       lower <- rep(0,dim_int)
       upper <- rep(time[j],dim_int)
-      tmax <- time[j]
+      tmax <- c(time[j],-1)
       
       if(length(lower) == 0){
-        opi[j] = integrand(times=1,tt = tmax, param = param, x = xval) # the value of times does not matter
+        opi[j] = integrand(times=1,tt = tmax[1], tt2=tmax[2],param = param, x = xval) # the value of times does not matter
       }else if(length(lower)>0){
         if(length(lower)<=2 ){
-          opi[j] = repintegrate(integrand,tt=tmax,lower=lower,upper = upper, param = param, x = xval)
+          opi[j] = repintegrate(integrand,tt = tmax[1], tt2=tmax[2],lower=lower,upper = upper, param = param, x = xval)
+          
+          # opi[j] = tryCatch({
+          #   repintegrate(integrand,tt=tmax[1],tt2=tmax[2],lower=lower,upper = upper, param = param, 
+          #                x = xval)
+          # },error=function(cond){
+          #   integrand2 <- change_integrand(integrand)
+          #   llij = cubintegrate(integrand2, lower = lower,upper = upper, method = "divonne", maxEval = 500,
+          #                         tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
+          #   return(llij)
+          # })
           
         }else if (length(lower)>2){
           opi[j] = cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
-                                tt = tmax, param = param, x = xval)$integral
+                                tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
         }
       }
     }
@@ -154,3 +164,69 @@ occupancy_prob = function(state, time, param, graph, xval = NULL){
   }
   return(op)
 }
+
+
+
+#' Compute the overall survival
+#'
+#' ...
+#'
+#' @param time A vector of timepoints for which to compute the occupancy probability.
+#' @param param  The parameter values in which the probabilities should be evaluated. The dimension
+#' and ordering is given by the user-specified densities.
+#' @param graph A directed, acyclic graph giving the multistate structure, in the igraph format (igraph package).
+#' @param xval A vector of covariate values.
+#' @return A vector of the same length as time.
+#' 
+overall_survival = function(time, param, graph, xval = NULL){
+  edge_mats = edge_matrices(graph)
+  names_surv_dens = names_of_survival_density(graph)
+  
+  state_ord = state_ordering(graph)
+  absorbing_states <- sort(state_ord$order[which(state_ord$type=="abs")])
+  
+  f_types = construct_formula_types(graph)
+  f_types_match = f_types[which(!(substr(f_types,nchar(f_types),nchar(f_types)) %in% absorbing_states))]
+  mm <- length(f_types_match)
+  
+  kk <- length(time)
+  op <- rep(0,kk)
+  for (i in 1:mm){
+    f_type = f_types_match[i]
+    integrand = eval(parse(text=type_to_integrand(f_type,edge_mats, names_surv_dens,abs_exact=FALSE))) # always with abs_exact=FALSE
+
+    dim_int <- nchar(f_type)-1 
+    
+    opi <- rep(NA,kk)
+    for (j in 1:kk){
+      lower <- rep(0,dim_int)
+      upper <- rep(time[j],dim_int)
+      tmax <- c(time[j],-1)
+      
+      if(length(lower) == 0){
+        opi[j] = integrand(times=1,tt = tmax[1], tt2=tmax[2],param = param, x = xval) # the value of times does not matter
+      }else if(length(lower)>0){
+        if(length(lower)<=2 ){
+          opi[j] = repintegrate(integrand,tt = tmax[1], tt2=tmax[2],lower=lower,upper = upper, param = param, x = xval)
+          
+          # opi[j] = tryCatch({
+          #   repintegrate(integrand,tt=tmax[1],tt2=tmax[2],lower=lower,upper = upper, param = param, 
+          #                x = xval)
+          # },error=function(cond){
+          #   integrand2 <- change_integrand(integrand)
+          #   llij = cubintegrate(integrand2, lower = lower,upper = upper, method = "divonne", maxEval = 500,
+          #                         tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
+          #   return(llij)
+          # })
+          
+        }else if (length(lower)>2){
+          opi[j] = cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
+                                tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
+        }
+      }
+    }
+    op = op + opi
+  }
+  return(op)
+}
+
