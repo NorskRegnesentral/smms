@@ -2,17 +2,15 @@
 ### Expo model with covariates (to see that we get the same as Jackson)
 setwd("H:/Multistate models/SemiMarkovMultistate")
 rm(list = ls())
+devtools::load_all() 
 library(igraph)
 library(parallel)
 library(cubature)
 ## For test-data
 library(msm)
 
-source("sm_msm_preprocessing_func.R")
-source("sm_msm_likelihood_func.R")
 
 ## Preprocessing
-gg = graph_from_literal("1"--+"2"--+"3", "1"--+"2", "1"--+"3")
 gg = graph_from_literal("1"--+"2"--+"3"--+"4", "1"--+"4", "2"--+"4")
 
 # Testing for CAV-data
@@ -29,94 +27,73 @@ dd$ihd = (dd$pdiag=="IHD")
 colnames(dd)[1:2] <- c("patient","time")
 
 # Model:
-S_01 = function(param, x, t){(as.numeric(t>=0))* (1-pweibull(t,param[1],param[2]*exp(param[3]*x[1]+param[4]*x[2])))}
-S_12 = function(param, x, t){(as.numeric(t>=0))* (1-pweibull(t,param[5],param[6]*exp(param[7]*x[1]+param[8]*x[2])))}
-S_23 = function(param, x, t){(as.numeric(t>=0))* (1-pweibull(t,param[9],param[10]*exp(param[11]*x[1]+param[12]*x[2])))}
-S_03 = function(param, x, t){(as.numeric(t>=0))* (1-pweibull(t,param[13],param[14]*exp(param[15]*x[1]+param[16]*x[2])))}
-S_13 = function(param, x, t){(as.numeric(t>=0))* (1-pweibull(t,param[17],param[18]*exp(param[19]*x[1]+param[20]*x[2])))}
+S_01 = function(param, x, t){1-pweibull(t,exp(param[1]),exp(param[2]+param[3]*x[1]+param[4]*x[2]))}
+S_12 = function(param, x, t){1-pweibull(t,exp(param[5]),exp(param[6]+param[7]*x[1]+param[8]*x[2]))}
+S_23 = function(param, x, t){1-pweibull(t,exp(param[9]),exp(param[10]+param[11]*x[1]+param[12]*x[2]))}
+S_03 = function(param, x, t){1-pweibull(t,exp(param[13]),exp(param[14]+param[15]*x[1]+param[16]*x[2]))}
+S_13 = function(param, x, t){1-pweibull(t,exp(param[17]),exp(param[18]+param[19]*x[1]+param[20]*x[2]))}
 
-f_01 = function(param, x, t){as.numeric(t>=0)*dweibull(t,param[1],param[2]*exp(param[3]*x[1]+param[4]*x[2]))}
-f_12 = function(param, x, t){as.numeric(t>=0)*dweibull(t,param[5],param[6]*exp(param[7]*x[1]+param[8]*x[2]))}
-f_23 = function(param, x, t){as.numeric(t>=0)*dweibull(t,param[9],param[10]*exp(param[11]*x[1]+param[12]*x[2]))}
-f_03 = function(param, x, t){as.numeric(t>=0)*dweibull(t,param[13],param[14]*exp(param[15]*x[1]+param[16]*x[2]))}
-f_13 = function(param, x, t){as.numeric(t>=0)*dweibull(t,param[17],param[18]*exp(param[19]*x[1]+param[20]*x[2]))}
-
-densities <- c(f_01,f_03,f_12,f_13,f_23)
-names(densities) <- c("01","03","12","13","23")
-
-survival_functions <- c(S_01,S_03,S_12,S_13,S_23)
-names(survival_functions) <- c("01","03","12","13","23") 
-
-## The edges for the transition to the absorbing state written in the "new" way
-edge_abs <- c("03","13","23")
-edge_mats <- edge_matrices(gg)
+f_01 = function(param, x, t){as.numeric(t>=0)*dweibull(t,exp(param[1]),exp(param[2]+param[3]*x[1]+param[4]*x[2]))}
+f_12 = function(param, x, t){as.numeric(t>=0)*dweibull(t,exp(param[5]),exp(param[6]+param[7]*x[1]+param[8]*x[2]))}
+f_23 = function(param, x, t){as.numeric(t>=0)*dweibull(t,exp(param[9]),exp(param[10]+param[11]*x[1]+param[12]*x[2]))}
+f_03 = function(param, x, t){as.numeric(t>=0)*dweibull(t,exp(param[13]),exp(param[14]+param[15]*x[1]+param[16]*x[2]))}
+f_13 = function(param, x, t){as.numeric(t>=0)*dweibull(t,exp(param[17]),exp(param[18]+param[19]*x[1]+param[20]*x[2]))}
 
 
 ## Part 3: From the time points of a given patient to an integral
-
-all_edges = get.edgelist(gg)
-all_absorbing = which(!(all_edges[,2] %in% all_edges[,1]))
-absorbing_state = unique(sapply(all_absorbing, function(p) all_edges[p,2]))
-all_states_old = state_ordering(gg)[,1]
-row_absorbing = sapply(1:length(absorbing_state), function(p) which(all_states_old == absorbing_state[p], arr.ind = TRUE))
-absorbing_state_new = sapply(row_absorbing, function(p) state_ordering(gg)[p,2])
-all_data_set = arrange_data(data_set = dd, gg)
+all_data_set = arrange_data(dd, gg)
 X_data_set = aggregate(dd[,c("dage_st","ihd")],by=list(dd$patient),FUN=median)
 X_data_set = as.matrix(X_data_set[,2:3])
 
 ## Finding all types, integrand, time points ++
 formula_obs_types = all_types(gg)
-all_data_set = arrange_data(data_set = dd, gg)
+edge_mats <- edge_matrices(gg)
+state_ord = state_ordering(gg)
+absorbing_states <- sort(state_ord$order[which(state_ord$type=="abs")])
+names_surv_dens = names_of_survival_density(gg)
+
+timepointMat <- all_data_set[,1:(dim(all_data_set)[2]-1)]
+
 observation_type = rep(NA, nrow(all_data_set))
 all_integral_limits = list()
 integrand = list()
-integrand2 = list()
-all_types = list()
+
 for(i in 1:nrow(all_data_set)){
   observation_type[i] = all_data_set[i,"obs_type"]
-  type = names(which(formula_obs_types[, observation_type[i]] == 1))
+  f_types = names(which(formula_obs_types[, observation_type[i]] == 1))
   integrand_mellomregn = list()
-  integrand_mellomregn2 = list()
   integral_mellomregn= list()
-  type_1 = list()
-  for(j in 1:length(type)){
-    integrand_mellomregn[[j]] = eval(parse(text=type_to_integrand_absExact(type[j], edge_mats, edge_abs)))
-    integrand_mellomregn2[[j]] = eval(parse(text=type_to_integrand_absExact_v2(type[j], edge_mats, edge_abs)))
-    integral_mellomregn[[j]] = finding_limits_integral(i, type[j], gg, all_edges, absorbing_state_new, all_data_set)
-    type_1[[j]] = type[j]
+  for(j in 1:length(f_types)){
+    integrand_mellomregn[[j]] = eval(parse(text=type_to_integrand(f_types[j], edge_mats, names_surv_dens)))
+    integral_mellomregn[[j]] = finding_limits(timepointMat[i,],f_types[j],edge_mats, absorbing_states)
   }
   all_integral_limits[[i]] = integral_mellomregn
   integrand[[i]] = integrand_mellomregn
-  integrand2[[i]] = integrand_mellomregn2
-  all_types[[i]] = type_1
 }
 
-params <- c(1.4,8,0.21,log(1.65),
-            1.2,3,log(0.8),log(1.2),
-            1.1,3.7,log(0.9),log(0.6),
-            0.4,400,log(1.6),log(1.3),
-            0.71,7,log(0.34),log(3))
+params <- c(0.41,2.3,-0.14,-0.327,0.25,1.11,0.17,-0.22,-0.01,0.92,0.09,0.43,-0.92,7.6,-1.59,-0.36,-1.08,4.88,1.89,-1.16)
 
 
-from_time_point_to_integral(params,method1 = "hcubature", integrand = integrand,integrand2 = integrand2, 
-                            all_integral_limits = all_integral_limits,X=X_data_set,mc_cores=1)
+mloglikelihood(params,integrand,all_integral_limits,method1 = "hcubature",X=X_data_set,mc_cores=10)
 
 system.time({
-  from_time_point_to_integral(params,method1 = "hcubature", integrand = integrand,integrand2 = integrand2,
-                              all_integral_limits = all_integral_limits,X=X_data_set,mc_cores=1)
+  oo <- nlminb(params,mloglikelihood,integrand = integrand,limits = all_integral_limits,
+               mc_cores=10,X=X_data_set)
 })
+2*oo$objective
 
-system.time({
-  oo <- nlminb(params,from_time_point_to_integral,integrand = integrand,integrand2 = integrand2, 
-               all_integral_limits = all_integral_limits,X=X_data_set,mc_cores=1,lower=rep(c(0.0001,0.0001,-Inf,-Inf),5))
-})
+
+# With covariates on the scale parameter
 2*oo$objective #2736.213
 ## time: 3728 seconds (1 hour)
-#$par
-#[1]    1.48463435   10.03962215   -0.14239643   -0.32672465    1.28785513    3.02294341    0.17143335   -0.21878803    0.99196746
-#[10]    2.49930581    0.09261627    0.42692674    0.40632560 1959.80580907   -1.58964871   -0.35546076    0.34401393  132.18420920
-#[19]    1.89155808   -1.15943047
-aa <- c(1.48,10.04,-0.14,-0.327,1.29,3.02,0.17,-0.22,0.99,2.50,0.09,0.43,0.41,1959.81,-1.59,-0.36,0.34,132.18,1.89,-1.16)
+#oo$par
+#[1]  0.395176238  2.306533314 -0.142396794 -0.326719502  0.252982108
+#[6]  1.106276893  0.171426567 -0.218790051 -0.007948915  0.916087018
+#[11]  0.092580630  0.426935854 -0.900624794  7.580816624 -1.589690902
+#[16] -0.355544744 -1.066852225  4.882702792  1.891081007 -1.159004675
+
+aa <- c(0.4,2.31,-0.14,-0.33,0.25,1.11,0.17,-0.22,-0.01,0.92,0.09,0.43,
+        -0.9,7.58,-1.59,-0.36,-1.07,4.88,1.89,-1.16)
 
 
 ######################## Plots #################################
@@ -179,131 +156,95 @@ dev.off()
 
 
 ## Occupancy probabilities
-f01_S12_S03_S13 = function(ss,teval,param,x,teval2=NA){ #
-  f_01(param,x,ss)*S_03(param,x,ss)*S_12(param,x,teval-ss)*S_13(param,x,teval-ss)
-}
-f01_f12_S23_S03_S13 = function(uu,ss,teval,param,x,teval2=NA){ #
-  f_01(param,x,ss)*f_12(param,x,uu)*S_23(param,x,teval-uu-ss)*S_03(param,x,ss)*S_13(param,x,uu)
-}
-f03_S01 <- function(ss,teval,param,x,teval2=NA){ #
-  f_03(param,x,ss)*S_01(param,x,ss)
-}
-f01_f13_S12_S03 = function(uu,ss,teval,param,x,teval2=NA){ #
-  f_01(param,x,ss)*S_03(param,x,ss)*f_13(param,x,uu)*S_12(param,x,uu)
-}
-f01_f12_S23_S23_S03_S13 = function(uu,ss,teval,teval2=NA,param,x){
-  if (is.na(teval2)){
-    up <- 1
-  }else{
-    up <- S_23(param,x,teval2-uu-ss)
-  }
-  f_01(param,x,ss)*f_12(param,x,uu)*(up-S_23(param,x,teval-uu-ss))*S_03(param,x,ss)*S_13(param,x,uu)
-}
-
-pi0 = function(param,tt,x){S_01(param,x,tt)*S_03(param,x,tt)}
-
-pi1 = function(param,tt,x){
-  nn <- length(tt)
-  pis <- rep(NA,nn)
-  for (i in 1:nn){
-    pis[i] <- integrate(f01_S12_S03_S13, lower = 0, upper = tt[i], teval = tt[i], param = param,x=x)$value
-  }
-  return(pis)
-}
-
-pi2 = function(param,tt,x){
-  nn <- length(tt)
-  pis <- rep(NA,nn)
-  for (i in 1:nn){
-    pis[i] <- int1(f01_f12_S23_S03_S13,teval=tt[i],param=param,x=x,tlim1=0,tlim2=tt[i],tlim1_l2=0,tlim2_l2=tt[i])
-  }
-  return(pis)
-}
-
-pi3 = function(param,tt,x){
-  nn <- length(tt)
-  pis <- rep(NA,nn)
-  for (i in 1:nn){
-    pis[i] <- (int1(f01_f12_S23_S23_S03_S13,teval=tt[i],param=param,x=x,tlim1=0,tlim2=tt[i],tlim1_l2=0,tlim2_l2=tt[i])
-               + int1(f01_f13_S12_S03,teval=NA,param=param,x=x,tlim1=0,tlim2=tt[i],tlim1_l2=0,tlim2_l2=tt[i])
-               + int1(f03_S01,teval=NA,param=param,x=x,tlim1=0,tlim2=tt[i],tlim1_l2=NA,tlim2_l2=NA))
-  }
-  return(pis)
-}
-# Integrals over functions of 2 variables
-int2 <- function(ss,innerfunc,teval,param,x,tlim1_l2,tlim2_l2,teval2=NA){ #integrate over uu
-  mm <- length(ss)
-  out <- rep(NA,mm)
-  for (i in 1:mm){
-    out[i] <- integrate(innerfunc,lower=max(tlim1_l2-ss[i],0),upper=tlim2_l2-ss[i],teval=teval,
-                        ss=ss[i],param=param,x=x)$value
-  }
-  return(out)
-} 
-# Integral over functions of 1 variable
-int1 <- function(innerfunc,teval,param,x,tlim1,tlim2,tlim1_l2,tlim2_l2,teval2=NA){ #integrate over ss
-  if (is.na(tlim1_l2)){
-    out <- integrate(innerfunc,lower=tlim1,upper=tlim2,teval=teval,param=param,x=x,teval2=teval2)$value
-  }else{
-    out <- integrate(int2,innerfunc=innerfunc,lower=max(tlim1,0),upper=tlim2,teval=teval,param=param,x=x,
-                     tlim1_l2=tlim1_l2,tlim2_l2=tlim2_l2)$value
-  }
-  return(out)
-} 
 
 tval <- seq(0.01,30,length=100)
-pi0f_y0 <- pi0(aa,tval,c(-1,0))
-pi0f_y1 <- pi0(aa,tval,c(-1,1))
-pi0f_o0 <- pi0(aa,tval,c(1,0))
-pi0f_o1 <- pi0(aa,tval,c(1,1))
-pi1f_y0 <- pi1(aa,tval,c(-1,0))
-pi1f_y1 <- pi1(aa,tval,c(-1,1))
-pi1f_o0 <- pi1(aa,tval,c(1,0))
-pi1f_o1 <- pi1(aa,tval,c(1,1))
-pi2f_y0 <- pi2(aa,tval,c(-1,0))
-pi2f_y1 <- pi2(aa,tval,c(-1,1))
-pi2f_o0 <- pi2(aa,tval,c(1,0))
-pi2f_o1 <- pi2(aa,tval,c(1,1))
-pi3f_y0 <- pi3(aa,tval,c(-1,0))
-pi3f_y1 <- pi3(aa,tval,c(-1,1))
-pi3f_o0 <- pi3(aa,tval,c(1,0))
-pi3f_o1 <- pi3(aa,tval,c(1,1))
+p0_y0 <- occupancy_prob("0",tval,params,gg,xval=c(-1,0))
+p0_y1 <- occupancy_prob("0",tval,params,gg,xval=c(-1,1))
+p0_o0 <- occupancy_prob("0",tval,params,gg,xval=c(1,0))
+p0_o1 <- occupancy_prob("0",tval,params,gg,xval=c(1,1))
+p1_y0 <- occupancy_prob("1",tval,params,gg,xval=c(-1,0))
+p1_y1 <- occupancy_prob("1",tval,params,gg,xval=c(-1,1))
+p1_o0 <- occupancy_prob("1",tval,params,gg,xval=c(1,0))
+p1_o1 <- occupancy_prob("1",tval,params,gg,xval=c(1,1))
+p2_y0 <- occupancy_prob("2",tval,params,gg,xval=c(-1,0))
+p2_y1 <- occupancy_prob("2",tval,params,gg,xval=c(-1,1))
+p2_o0 <- occupancy_prob("2",tval,params,gg,xval=c(1,0))
+p2_o1 <- occupancy_prob("2",tval,params,gg,xval=c(1,1))
+p3_y0 <- occupancy_prob("3",tval,params,gg,xval=c(-1,0))
+p3_y1 <- occupancy_prob("3",tval,params,gg,xval=c(-1,1))
+p3_o0 <- occupancy_prob("3",tval,params,gg,xval=c(1,0))
+p3_o1 <- occupancy_prob("3",tval,params,gg,xval=c(1,1))
 
-plot(tval,pi0f_y0+pi1f_y0+pi2f_y0+pi3f_y0,type="l")
-plot(tval,pi0f_y1+pi1f_y1+pi2f_y1+pi3f_y1,type="l")
-plot(tval,pi0f_o0+pi1f_o0+pi2f_o0+pi3f_o0,type="l")
-plot(tval,pi0f_o1+pi1f_o1+pi2f_o1+pi3f_o1,type="l")
+plot(tval,p0_y0+p1_y0+p2_y0+p3_y0,type="l")
+plot(tval,p0_y1+p1_y1+p2_y1+p3_y1,type="l")
+plot(tval,p0_o0+p1_o0+p2_o0+p3_o0,type="l")
+plot(tval,p0_o1+p1_o1+p2_o1+p3_o1,type="l")
+
+# msm package with covariates
+twoway4.q <- rbind(c(0, 0.25, 0, 0.25), c(0.166, 0, 0.166, 0.166),c(0, 0.25, 0, 0.25), c(0, 0, 0, 0))
+rownames(twoway4.q) <- colnames(twoway4.q) <- c("Well", "Mild","Severe", "Death")
+cav.msm <- msm(state ~ time, subject = patient, data = dd,covariates=~dage_st+ihd,
+               qmatrix = twoway4.q, death = 4,method = "BFGS", control = list(fnscale = 4000, maxit = 10000))
+
+prev_y0 <- prevalence.msm(cav.msm,times=tval,covariates=list(dage_st=-1,ihdTRUE=0))
+prev_y1 <- prevalence.msm(cav.msm,times=tval,covariates=list(dage_st=-1,ihdTRUE=1))
+prev_o0 <- prevalence.msm(cav.msm,times=tval,covariates=list(dage_st=1,ihdTRUE=0))
+prev_o1 <- prevalence.msm(cav.msm,times=tval,covariates=list(dage_st=1,ihdTRUE=1))
+
 
 pdf("cav_weibull_cov_prevalence.pdf", width=11, height=7)
 par(mfrow=c(2,2))
 par(bty="l")
 par(mar=c(4,4,1,2))
 par(cex=1)
-plot(tval,pi0f_y0*100,type="l",col="#0571b0",ylim=c(0,100),lwd=3,xlab=" ",
+plot(tval,prev_y0$`Observed percentages`[,1],type="l",ylim=c(0,100),lwd=3,xlab=" ",col="dark grey",
      ylab="prevalence (%)",main="State 0")
-lines(tval,pi0f_y1*100,col="#ca0020",lwd=3)
-lines(tval,pi0f_o0*100,col="#0571b0",lwd=3,lty=2)
-lines(tval,pi0f_o1*100,col="#ca0020",lwd=3,lty=2)
+lines(tval,p0_y0*100,col="#0571b0",lwd=3)
+lines(tval,p0_y1*100,col="#ca0020",lwd=3)
+lines(tval,p0_o0*100,col="#0571b0",lwd=3,lty=2)
+lines(tval,p0_o1*100,col="#ca0020",lwd=3,lty=2)
+lines(tval,prev_y0$`Expected percentages`[,1],col="#0571b0",lwd=1)
+lines(tval,prev_y1$`Expected percentages`[,1],col="#ca0020",lwd=1)
+lines(tval,prev_o0$`Expected percentages`[,1],col="#0571b0",lwd=1,lty=2)
+lines(tval,prev_o1$`Expected percentages`[,1],col="#ca0020",lwd=1,lty=2)
 
-plot(tval,pi1f_y0*100,type="l",col="#0571b0",ylim=c(0,100),lwd=3,xlab=" ",
+plot(tval,prev_y0$`Observed percentages`[,2],type="l",col="dark grey",ylim=c(0,100),lwd=3,xlab=" ",
      ylab="prevalence (%)",main="State 1")
-lines(tval,pi1f_y1*100,col="#ca0020",lwd=3)
-lines(tval,pi1f_o0*100,col="#0571b0",lwd=3,lty=2)
-lines(tval,pi1f_o1*100,col="#ca0020",lwd=3,lty=2)
+lines(tval,p1_y0*100,col="#0571b0",lwd=3)
+lines(tval,p1_y1*100,col="#ca0020",lwd=3)
+lines(tval,p1_o0*100,col="#0571b0",lwd=3,lty=2)
+lines(tval,p1_o1*100,col="#ca0020",lwd=3,lty=2)
+lines(tval,prev_y0$`Expected percentages`[,2],col="#0571b0",lwd=1)
+lines(tval,prev_y1$`Expected percentages`[,2],col="#ca0020",lwd=1)
+lines(tval,prev_o0$`Expected percentages`[,2],col="#0571b0",lwd=1,lty=2)
+lines(tval,prev_o1$`Expected percentages`[,2],col="#ca0020",lwd=1,lty=2)
 legend("topright",legend=c("youger donor, no IHD","youger donor, IHD","older donor, no IHD","older donor, IHD"),
        col=c("#0571b0","#ca0020","#0571b0","#ca0020"),lwd=2,bty="n",lty=c(1,1,2,2),cex=0.7)
 
-plot(tval,pi2f_y0*100,type="l",col="#0571b0",ylim=c(0,100),lwd=3,xlab="years after transplantation",
-     ylab="prevalence (%)",main="State 2")
-lines(tval,pi2f_y1*100,col="#ca0020",lwd=3)
-lines(tval,pi2f_o0*100,col="#0571b0",lwd=3,lty=2)
-lines(tval,pi2f_o1*100,col="#ca0020",lwd=3,lty=2)
+#legend("topright",legend=c("no IHD","IHD","older donor, no IHD","older donor, IHD"),
+#       col=c("#0571b0","#ca0020","black","#ca0020"),lwd=2,bty="n",lty=c(1,1,2,2),cex=0.7)
 
-plot(tval,pi3f_y0*100,type="l",col="#0571b0",ylim=c(0,100),lwd=3,xlab="years after transplantation",
+plot(tval,prev_y0$`Observed percentages`[,3],type="l",col="dark grey",ylim=c(0,100),lwd=3,xlab="years after transplantation",
+     ylab="prevalence (%)",main="State 2")
+lines(tval,p2_y0*100,col="#0571b0",lwd=3)
+lines(tval,p2_y1*100,col="#ca0020",lwd=3)
+lines(tval,p2_o0*100,col="#0571b0",lwd=3,lty=2)
+lines(tval,p2_o1*100,col="#ca0020",lwd=3,lty=2)
+lines(tval,prev_y0$`Expected percentages`[,3],col="#0571b0",lwd=1)
+lines(tval,prev_y1$`Expected percentages`[,3],col="#ca0020",lwd=1)
+lines(tval,prev_o0$`Expected percentages`[,3],col="#0571b0",lwd=1,lty=2)
+lines(tval,prev_o1$`Expected percentages`[,3],col="#ca0020",lwd=1,lty=2)
+
+plot(tval,prev_y0$`Observed percentages`[,4],type="l",col="dark grey",ylim=c(0,100),lwd=3,xlab="years after transplantation",
      ylab="prevalence (%)",main="State 3")
-lines(tval,pi3f_y1*100,col="#ca0020",lwd=3)
-lines(tval,pi3f_o0*100,col="#0571b0",lwd=3,lty=2)
-lines(tval,pi3f_o1*100,col="#ca0020",lwd=3,lty=2)
+lines(tval,p3_y0*100,col="#0571b0",lwd=3)
+lines(tval,p3_y1*100,col="#ca0020",lwd=3)
+lines(tval,p3_o0*100,col="#0571b0",lwd=3,lty=2)
+lines(tval,p3_o1*100,col="#ca0020",lwd=3,lty=2)
+lines(tval,prev_y0$`Expected percentages`[,4],col="#0571b0",lwd=1)
+lines(tval,prev_y1$`Expected percentages`[,4],col="#ca0020",lwd=1)
+lines(tval,prev_o0$`Expected percentages`[,4],col="#0571b0",lwd=1,lty=2)
+lines(tval,prev_o1$`Expected percentages`[,4],col="#ca0020",lwd=1,lty=2)
 dev.off()
 
 #### Overall survival
@@ -323,6 +264,9 @@ Sy0 <- S_total(tval,aa,c(-1,0))
 Sy1 <- S_total(tval,aa,c(-1,1))
 So0 <- S_total(tval,aa,c(1,0))
 So1 <- S_total(tval,aa,c(1,1))
+
+plot.survfit.msm(cav.msm, col.surv="black",lwd.surv=2,xlab="years after transplantation",
+                 ylab="survival",main=" ",legend.pos=None,col="#ca0020",lwd=3,covariates=list(dage_st=-1,ihdTRUE=0))
 
 pdf("cav_weibull_cov_survival.pdf", width=11, height=7)
 par(mfrow=c(1,1))
