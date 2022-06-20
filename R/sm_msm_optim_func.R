@@ -88,10 +88,8 @@ smms = function(startval, data, graph, X = NULL, mc_cores = 3){
   hessian_optimizer = hessian(mloglikelihood, optimizer$par, integrand = integrand,limits = all_integral_limits,
                               mc_cores=mc_cores,X=X)
   return(list(optimizer, hessian_optimizer))
-<<<<<<< HEAD
 }
-=======
-}
+
 #optim_func(params = params, dd, gg)
 
 
@@ -157,4 +155,4 @@ occupancy_prob = function(state, time, param, graph, xval = NULL){
   }
   return(op)
 }
->>>>>>> 975cc7257f77b639831ab9610dbce388684a7def
+
