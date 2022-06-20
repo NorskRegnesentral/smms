@@ -150,7 +150,7 @@ type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE)
     }
     
     # paste everything together
-    f_intro <- paste("function(",paste(var_def,collapse=""),"tt,param,x){")
+    f_intro <- paste("function(",paste(var_def,collapse=""),"tt,param,x,...){")
     f_end <- "}"
     f_prod <- paste(paste(f_trav,collapse=""),paste(S_passed,collapse=""),paste(S_posi,collapse=""))
     ff <- paste(f_intro,f_prod,f_end)
@@ -236,7 +236,7 @@ type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE)
     }
     
     # paste everything together
-    f_intro <- "function(times,tt,param,x){"
+    f_intro <- "function(times,tt,param,x,...){"
     if (intoAbs==TRUE & abs_exact==FALSE & choice==FALSE){
       f_intro <- "function(times,tt,param,x,tt2=-1){" #perhaps tt2=NULL?
     } 
@@ -258,7 +258,7 @@ type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE)
 #'
 #'
 # Integrals over functions of 2 variables
-repint2 <- function(ss,innerfunc,tt,param,lower2,upper2,x){ #integrate over uu
+repint2 <- function(ss,innerfunc,tt,param,lower2,upper2,x,...){ #integrate over uu
   mm <- length(ss)
   out <- rep(NA,mm)
   for (i in 1:mm){
@@ -268,7 +268,7 @@ repint2 <- function(ss,innerfunc,tt,param,lower2,upper2,x){ #integrate over uu
   return(out)
 } 
 # Integral over functions of 1 variable
-repintegrate <- function(innerfunc,tt,param,x,lower,upper){ #integrate over ss
+repintegrate <- function(innerfunc,tt,param,x,lower,upper,...){ #integrate over ss
   if (length(lower)==1){
     out <- integrate(innerfunc,lower=lower,upper=upper,tt=tt,param=param,x=x)$value
   }else{
@@ -277,6 +277,30 @@ repintegrate <- function(innerfunc,tt,param,x,lower,upper){ #integrate over ss
   }
   return(out)
 } 
+
+#' Change integrand 
+#'
+#' Change integrand syntax from the form appropriate for repintegrate() to the form appropriate 
+#' for cubintegrate().
+#'
+#' @param integrand An R function from eval-parse and type_to_integrand().
+#' @return An R function
+#' 
+change_integrand <- function(integr){
+  int <- paste0(deparse(integr), collapse = " ")
+  m <- regexpr("ss,.+tt,",int)
+  call <- regmatches(int,m)
+  int <- sub("ss,.+tt,","times,tt,",int)
+  if (grepl("uu",call)){
+    int <- sub("\\{.+f_01","\\{\nss<-times[1]\nuu<-times[2]\nf_01",int)
+    int <- gsub(", uu",", uu-ss",int)
+    int <- gsub("tt - uu - ss","tt- uu",int)
+    int <- gsub("tt - ss - uu","tt- uu",int)
+  }else{
+    int <- sub("\\{.+f_01","\\{\nss<-times[1]\nf_01",int)
+  }
+  return(eval(parse(text=int)))
+}
 
 
 #' Find the limits of integration 
@@ -295,7 +319,6 @@ repintegrate <- function(innerfunc,tt,param,x,lower,upper){ #integrate over ss
 #' upper limits of integration, and "tmax" the last timepoint (in which the integrand often needs 
 #' to be evaluated).
 #' 
-# FIX function for abs_exact=FALSE
 finding_limits <- function(timepoints,form_type,edge_mats,absorbing_states,abs_exact=TRUE){
   splitted_f_type = unlist(strsplit(form_type, ""))
   
@@ -406,42 +429,38 @@ mloglikelihood <-  function(param,integrand,limits, X = NULL,method1 = "hcubatur
       upper <- unlist(limits[[i]][[j]]$upper)
       tmax <- unlist(limits[[i]][[j]]$tmax)
       
+      
       if(length(lower) == 0){
-        lli[j] = integrand[[i]][[j]](times=1,tt = tmax[1], param = param, x = X[i,]) # the value of times does not matter
+        lli[j] = integrand[[i]][[j]](times=1,tt = tmax[1], tt2=tmax[2],param = param, x = X[i,]) # the value of times does not matter
       }else if(length(lower)>0){
         if(length(lower)<=2 ){
-          lli[j] = repintegrate(integrand[[i]][[j]],tt=tmax[1],lower=lower,upper = upper, param = param, x = X[i,])
-          
+          # If integrate fails, use cubintegrate:
+            lli[j] = tryCatch({
+              repintegrate(integrand[[i]][[j]],tt=tmax[1],tt2=tmax[2],lower=lower,upper = upper, param = param, 
+                                    x = X[i,])
+            },error=function(cond){
+              integrand2 <- change_integrand(integrand[[i]][[j]])
+              if (length(unique(lower)) != length(lower)){
+                llij = cubintegrate(integrand2, lower = lower,upper = upper, method = "divonne", maxEval = 500,
+                                      tt = tmax[1], tt2=tmax[2],param = param, x = X[i,])$integral
+              }else if (length(unique(lower)) == length(lower)){
+                llij = cubintegrate(integrand2, lower = lower,upper = upper,maxEval = 500,
+                                      method = method1, tt = tmax[1], tt2=tmax[2],param = param, x = X[i,])$integral
+              }
+              return(llij)
+            })
+            
         }else if (length(lower)>2){
           if (length(unique(lower)) != length(lower)){
             lli[j] = cubintegrate(integrand[[i]][[j]], lower = lower,upper = upper, method = "divonne", maxEval = 500,
-                                  tt = tmax[1], param = param, x = X[i,])$integral
+                                  tt = tmax[1], tt2=tmax[2],param = param, x = X[i,])$integral
           }else if (length(unique(lower)) == length(lower)){
             lli[j] = cubintegrate(integrand[[i]][[j]], lower = lower,upper = upper,maxEval = 500,
-                                  method = method1, tt = tmax[1], param = param, x = X[i,])$integral
+                                  method = method1, tt = tmax[1], tt2=tmax[2],param = param, x = X[i,])$integral
           }
         }
       }
       
-      # In the case of abs_exact=FALSE, and entering absorbing state from node without choice:
-      if (tmax[2]!=-1){
-        if(length(lower) == 0){
-          lli[j] = integrand[[i]][[j]](times=1,tt = tmax[1], param = param, x = X[i,],tt2=tmax[2]) # the value of times does not matter
-        }else if(length(lower)>0){
-          if(length(lower)<=2 ){
-            lli[j] = repintegrate(integrand[[i]][[j]],tt=tmax[1],lower=lower,upper = upper, param = param, x = X[i,],tt2=tmax[2])
-            
-          }else if (length(lower)>2){
-            if (length(unique(lower)) != length(lower)){
-              lli[j] = cubintegrate(integrand[[i]][[j]], lower = lower,upper = upper, method = "divonne", maxEval = 500,
-                                    tt = tmax[1], tt2=tmax[2], param = param, x = X[i,])$integral
-            }else if (length(unique(lower)) == length(lower)){
-              lli[j] = cubintegrate(integrand[[i]][[j]], lower = lower,upper = upper,maxEval = 500,
-                                    method = method1, tt = tmax[1], tt2=tmax[2], param = param, x = X[i,])$integral
-            }
-          }
-        }
-      }
     }
     -log(sum(lli))
   }, mc.cores = mc_cores)))

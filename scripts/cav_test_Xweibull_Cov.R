@@ -89,9 +89,17 @@ mloglikelihood(params,integrand,all_integral_limits,method1 = "hcubature",X=X_da
 
 system.time({
   oo <- nlminb(params,mloglikelihood,integrand = integrand,limits = all_integral_limits,
-               mc_cores=10,X=X_data_set)
+               mc_cores=10,X=X_data_set,lower=rep(-50,length(params)),upper=rep(50,length(params)))
 })
 2*oo$objective
+# 2455.507
+
+#round(exp(oo$par),3)
+#[1]    0.561 2644.084    0.781    0.997    0.490   22.633    0.949    0.908
+#[9]    0.418  140.696    0.993    1.393    0.755    1.270    1.178    0.689
+#[17]    1.453    0.129    0.539    4.033    0.029    0.262    0.173    0.140
+#[25]    0.143
+
 
 
 ################# kjoer opp til hit ####################
@@ -168,100 +176,28 @@ dev.off()
 
 
 ## Occupancy probabilities
-f01_S12_S03_S13 = function(ss,teval,param,x,teval2=NA){ #
-  f_01(param,x,ss)*S_03(param,x,ss)*S_12(param,x,teval-ss)*S_13(param,x,teval-ss)
-}
-f01_f12_S23_S03_S13 = function(uu,ss,teval,param,x,teval2=NA){ #
-  f_01(param,x,ss)*f_12(param,x,uu)*S_23(param,x,teval-uu-ss)*S_03(param,x,ss)*S_13(param,x,uu)
-}
-f03_S01 <- function(ss,teval,param,x,teval2=NA){ #
-  f_03(param,x,ss)*S_01(param,x,ss)
-}
-f01_f13_S12_S03 = function(uu,ss,teval,param,x,teval2=NA){ #
-  f_01(param,x,ss)*S_03(param,x,ss)*f_13(param,x,uu)*S_12(param,x,uu)
-}
-f01_f12_S23_S23_S03_S13 = function(uu,ss,teval,teval2=NA,param,x){
-  if (is.na(teval2)){
-    up <- 1
-  }else{
-    up <- S_23(param,x,teval2-uu-ss)
-  }
-  f_01(param,x,ss)*f_12(param,x,uu)*(up-S_23(param,x,teval-uu-ss))*S_03(param,x,ss)*S_13(param,x,uu)
-}
-
-pi0 = function(param,tt,x){S_01(param,x,tt)*S_03(param,x,tt)}
-
-pi1 = function(param,tt,x){
-  nn <- length(tt)
-  pis <- rep(NA,nn)
-  for (i in 1:nn){
-    pis[i] <- integrate(f01_S12_S03_S13, lower = 0, upper = tt[i], teval = tt[i], param = param,x=x)$value
-  }
-  return(pis)
-}
-
-pi2 = function(param,tt,x){
-  nn <- length(tt)
-  pis <- rep(NA,nn)
-  for (i in 1:nn){
-    pis[i] <- int1(f01_f12_S23_S03_S13,teval=tt[i],param=param,x=x,tlim1=0,tlim2=tt[i],tlim1_l2=0,tlim2_l2=tt[i])
-  }
-  return(pis)
-}
-
-pi3 = function(param,tt,x){
-  nn <- length(tt)
-  pis <- rep(NA,nn)
-  for (i in 1:nn){
-    pis[i] <- (int1(f01_f12_S23_S23_S03_S13,teval=tt[i],param=param,x=x,tlim1=0,tlim2=tt[i],tlim1_l2=0,tlim2_l2=tt[i])
-               + int1(f01_f13_S12_S03,teval=NA,param=param,x=x,tlim1=0,tlim2=tt[i],tlim1_l2=0,tlim2_l2=tt[i])
-               + int1(f03_S01,teval=NA,param=param,x=x,tlim1=0,tlim2=tt[i],tlim1_l2=NA,tlim2_l2=NA))
-  }
-  return(pis)
-}
-# Integrals over functions of 2 variables
-int2 <- function(ss,innerfunc,teval,param,x,tlim1_l2,tlim2_l2,teval2=NA){ #integrate over uu
-  mm <- length(ss)
-  out <- rep(NA,mm)
-  for (i in 1:mm){
-    out[i] <- integrate(innerfunc,lower=max(tlim1_l2-ss[i],0),upper=tlim2_l2-ss[i],teval=teval,
-                        ss=ss[i],param=param,x=x)$value
-  }
-  return(out)
-} 
-# Integral over functions of 1 variable
-int1 <- function(innerfunc,teval,param,x,tlim1,tlim2,tlim1_l2,tlim2_l2,teval2=NA){ #integrate over ss
-  if (is.na(tlim1_l2)){
-    out <- integrate(innerfunc,lower=tlim1,upper=tlim2,teval=teval,param=param,x=x,teval2=teval2)$value
-  }else{
-    out <- integrate(int2,innerfunc=innerfunc,lower=max(tlim1,0),upper=tlim2,teval=teval,param=param,x=x,
-                     tlim1_l2=tlim1_l2,tlim2_l2=tlim2_l2)$value
-  }
-  return(out)
-} 
-
 tval <- seq(0.01,30,length=100)
-pi0f_y0 <- pi0(aa,tval,c(-1,0))
-pi0f_y1 <- pi0(aa,tval,c(-1,1))
-pi0f_o0 <- pi0(aa,tval,c(1,0))
-pi0f_o1 <- pi0(aa,tval,c(1,1))
-pi1f_y0 <- pi1(aa,tval,c(-1,0))
-pi1f_y1 <- pi1(aa,tval,c(-1,1))
-pi1f_o0 <- pi1(aa,tval,c(1,0))
-pi1f_o1 <- pi1(aa,tval,c(1,1))
-pi2f_y0 <- pi2(aa,tval,c(-1,0))
-pi2f_y1 <- pi2(aa,tval,c(-1,1))
-pi2f_o0 <- pi2(aa,tval,c(1,0))
-pi2f_o1 <- pi2(aa,tval,c(1,1))
-pi3f_y0 <- pi3(aa,tval,c(-1,0))
-pi3f_y1 <- pi3(aa,tval,c(-1,1))
-pi3f_o0 <- pi3(aa,tval,c(1,0))
-pi3f_o1 <- pi3(aa,tval,c(1,1))
+p0_y0 <- occupancy_prob("0",tval,params,gg,xval=c(-1,0))
+p0_y1 <- occupancy_prob("0",tval,params,gg,xval=c(-1,1))
+p0_o0 <- occupancy_prob("0",tval,params,gg,xval=c(1,0))
+p0_o1 <- occupancy_prob("0",tval,params,gg,xval=c(1,1))
+p1_y0 <- occupancy_prob("1",tval,params,gg,xval=c(-1,0))
+p1_y1 <- occupancy_prob("1",tval,params,gg,xval=c(-1,1))
+p1_o0 <- occupancy_prob("1",tval,params,gg,xval=c(1,0))
+p1_o1 <- occupancy_prob("1",tval,params,gg,xval=c(1,1))
+p2_y0 <- occupancy_prob("2",tval,params,gg,xval=c(-1,0))
+p2_y1 <- occupancy_prob("2",tval,params,gg,xval=c(-1,1))
+p2_o0 <- occupancy_prob("2",tval,params,gg,xval=c(1,0))
+p2_o1 <- occupancy_prob("2",tval,params,gg,xval=c(1,1))
+p3_y0 <- occupancy_prob("3",tval,params,gg,xval=c(-1,0))
+p3_y1 <- occupancy_prob("3",tval,params,gg,xval=c(-1,1))
+p3_o0 <- occupancy_prob("3",tval,params,gg,xval=c(1,0))
+p3_o1 <- occupancy_prob("3",tval,params,gg,xval=c(1,1))
 
-plot(tval,pi0f_y0+pi1f_y0+pi2f_y0+pi3f_y0,type="l")
-plot(tval,pi0f_y1+pi1f_y1+pi2f_y1+pi3f_y1,type="l")
-plot(tval,pi0f_o0+pi1f_o0+pi2f_o0+pi3f_o0,type="l")
-plot(tval,pi0f_o1+pi1f_o1+pi2f_o1+pi3f_o1,type="l")
+plot(tval,p0_y0+p1_y0+p2_y0+p3_y0,type="l")
+plot(tval,p0_y1+p1_y1+p2_y1+p3_y1,type="l")
+plot(tval,p0_o0+p1_o0+p2_o0+p3_o0,type="l")
+plot(tval,p0_o1+p1_o1+p2_o1+p3_o1,type="l")
 
 # msm package with covariates
 twoway4.q <- rbind(c(0, 0.25, 0, 0.25), c(0.166, 0, 0.166, 0.166),c(0, 0.25, 0, 0.25), c(0, 0, 0, 0))
@@ -282,10 +218,10 @@ par(mar=c(4,4,1,2))
 par(cex=1)
 plot(tval,prev_y0$`Observed percentages`[,1],type="l",ylim=c(0,100),lwd=3,xlab=" ",col="dark grey",
      ylab="prevalence (%)",main="State 0")
-lines(tval,pi0f_y0*100,col="#0571b0",lwd=3)
-lines(tval,pi0f_y1*100,col="#ca0020",lwd=3)
-lines(tval,pi0f_o0*100,col="#0571b0",lwd=3,lty=2)
-lines(tval,pi0f_o1*100,col="#ca0020",lwd=3,lty=2)
+lines(tval,p0_y0*100,col="#0571b0",lwd=3)
+lines(tval,p0_y1*100,col="#ca0020",lwd=3)
+lines(tval,p0_o0*100,col="#0571b0",lwd=3,lty=2)
+lines(tval,p0_o1*100,col="#ca0020",lwd=3,lty=2)
 lines(tval,prev_y0$`Expected percentages`[,1],col="#0571b0",lwd=1)
 lines(tval,prev_y1$`Expected percentages`[,1],col="#ca0020",lwd=1)
 lines(tval,prev_o0$`Expected percentages`[,1],col="#0571b0",lwd=1,lty=2)
@@ -293,10 +229,10 @@ lines(tval,prev_o1$`Expected percentages`[,1],col="#ca0020",lwd=1,lty=2)
 
 plot(tval,prev_y0$`Observed percentages`[,2],type="l",col="dark grey",ylim=c(0,100),lwd=3,xlab=" ",
      ylab="prevalence (%)",main="State 1")
-lines(tval,pi1f_y0*100,col="#0571b0",lwd=3)
-lines(tval,pi1f_y1*100,col="#ca0020",lwd=3)
-lines(tval,pi1f_o0*100,col="#0571b0",lwd=3,lty=2)
-lines(tval,pi1f_o1*100,col="#ca0020",lwd=3,lty=2)
+lines(tval,p1_y0*100,col="#0571b0",lwd=3)
+lines(tval,p1_y1*100,col="#ca0020",lwd=3)
+lines(tval,p1_o0*100,col="#0571b0",lwd=3,lty=2)
+lines(tval,p1_o1*100,col="#ca0020",lwd=3,lty=2)
 lines(tval,prev_y0$`Expected percentages`[,2],col="#0571b0",lwd=1)
 lines(tval,prev_y1$`Expected percentages`[,2],col="#ca0020",lwd=1)
 lines(tval,prev_o0$`Expected percentages`[,2],col="#0571b0",lwd=1,lty=2)
@@ -309,10 +245,10 @@ legend("topright",legend=c("youger donor, no IHD","youger donor, IHD","older don
 
 plot(tval,prev_y0$`Observed percentages`[,3],type="l",col="dark grey",ylim=c(0,100),lwd=3,xlab="years after transplantation",
      ylab="prevalence (%)",main="State 2")
-lines(tval,pi2f_y0*100,col="#0571b0",lwd=3)
-lines(tval,pi2f_y1*100,col="#ca0020",lwd=3)
-lines(tval,pi2f_o0*100,col="#0571b0",lwd=3,lty=2)
-lines(tval,pi2f_o1*100,col="#ca0020",lwd=3,lty=2)
+lines(tval,p2_y0*100,col="#0571b0",lwd=3)
+lines(tval,p2_y1*100,col="#ca0020",lwd=3)
+lines(tval,p2_o0*100,col="#0571b0",lwd=3,lty=2)
+lines(tval,p2_o1*100,col="#ca0020",lwd=3,lty=2)
 lines(tval,prev_y0$`Expected percentages`[,3],col="#0571b0",lwd=1)
 lines(tval,prev_y1$`Expected percentages`[,3],col="#ca0020",lwd=1)
 lines(tval,prev_o0$`Expected percentages`[,3],col="#0571b0",lwd=1,lty=2)
@@ -320,17 +256,18 @@ lines(tval,prev_o1$`Expected percentages`[,3],col="#ca0020",lwd=1,lty=2)
 
 plot(tval,prev_y0$`Observed percentages`[,4],type="l",col="dark grey",ylim=c(0,100),lwd=3,xlab="years after transplantation",
      ylab="prevalence (%)",main="State 3")
-lines(tval,pi3f_y0*100,col="#0571b0",lwd=3)
-lines(tval,pi3f_y1*100,col="#ca0020",lwd=3)
-lines(tval,pi3f_o0*100,col="#0571b0",lwd=3,lty=2)
-lines(tval,pi3f_o1*100,col="#ca0020",lwd=3,lty=2)
+lines(tval,p3_y0*100,col="#0571b0",lwd=3)
+lines(tval,p3_y1*100,col="#ca0020",lwd=3)
+lines(tval,p3_o0*100,col="#0571b0",lwd=3,lty=2)
+lines(tval,p3_o1*100,col="#ca0020",lwd=3,lty=2)
 lines(tval,prev_y0$`Expected percentages`[,4],col="#0571b0",lwd=1)
 lines(tval,prev_y1$`Expected percentages`[,4],col="#ca0020",lwd=1)
 lines(tval,prev_o0$`Expected percentages`[,4],col="#0571b0",lwd=1,lty=2)
 lines(tval,prev_o1$`Expected percentages`[,4],col="#ca0020",lwd=1,lty=2)
 dev.off()
 
-#### Overall survival
+
+#### Overall survival: needs to be reimplemented!
 S_total <- function(tt,param,x){
   nn <- length(tt)
   pp <- rep(NA,nn)
