@@ -52,7 +52,7 @@ all_types(gg3) # we assume that we now which initial state patients come from!
 all_types(gg4)
 
 ##
-dd1 <- data.frame(patient=c(rep(1,4),rep(2,5)),time=c(1,1.5,2,2.5,0,1,2,3,4),state=c(2,2,2,3,1,1,3,4,4))
+dd1 <- data.frame(patient=c(rep(1,4),rep(2,5)),time=c(1,1.5,2,2.5,0,1,2,3,4),state=c(2,2,2,3,1,1,1,3,3))
 
 relevant_timepoints(dd1,gg1)
 
@@ -74,6 +74,7 @@ relevant_timepoints(dd4,gg4)
 
 ##
 arrange_data(dd1,gg1)
+arrange_data_old(dd1,gg1)
 arrange_data(dd2,gg2)
 arrange_data(dd3,gg3) 
 arrange_data(dd4,gg4)
