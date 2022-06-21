@@ -85,12 +85,37 @@ smms = function(startval, data, graph, X = NULL, mc_cores = 3){
     
   optimizer <- optim(startval,mloglikelihood,integrand = integrand,limits = all_integral_limits,X=X, method = "L-BFGS",
                mc_cores=mc_cores,hessian = FALSE)
-  hessian_optimizer = hessian(mloglikelihood, optimizer$par, integrand = integrand,limits = all_integral_limits,
+  hessian_optimizer = numDeriv::hessian(mloglikelihood, optimizer$par, integrand = integrand,limits = all_integral_limits,
                               mc_cores=mc_cores,X=X)
   return(list(optimizer, hessian_optimizer))
 }
 #optim_func(params = params, dd, gg)
 
+
+
+#' Estimates and confidence intervals
+#'
+#' Provide estimates and approximate confidence intervals for all parameters 
+#' (on the "original" scale - meaning that all parameters live on -Inf to +Inf).
+#'
+#' @param param  The parameter estimates.
+#' @param hessian The hessian matrix.
+#' @param level The level of confidence. Default value is 0.95.
+#' @param log Boolean denoting whether the intervals should be on the log scale (default), or on the exp/hazard scale.
+#' @return A vector of the same length as time.
+#' 
+est_ci = function(param, hessian,level=0.95,log=TRUE){
+  zz <- qnorm(0.5*(1-level),lower.tail = F)
+  varCov <- solve(hessian)
+  if (log){
+    tt <- data.frame(estimate=param,lower.ci=param-zz*sqrt(diag(varCov)),upper.ci=param+zz*sqrt(diag(varCov)))
+  }else{
+    ses <- sqrt(diag(varCov))*exp(param)
+    tt <- data.frame(estimate=exp(param),lower.ci=exp(param)-zz*ses,upper.ci=exp(param)+zz*ses)
+  }
+  
+  return(tt)
+}
 
 ###################### Functions for diagnostic plots ##############
 
@@ -165,6 +190,72 @@ occupancy_prob = function(state, time, param, graph, xval = NULL){
   return(op)
 }
 
+#' Compute uncertainty bands
+#' 
+occupancy_prob_ci_band <- function(state,time,param,graph,xval,hessian,level=0.95){
+  est <- occupancy_prob(state=state,time=time,param=param,graph=graph,xval=xval)
+  delta <- occupancy_prob_delta(state=state,time=time,param=param,graph=graph,xval=xval)
+  varCov <- solve(hessian)
+  kk <- length(time)
+  lci <- rep(NA,kk)
+  uci <- rep(NA,kk)
+  zz <- qnorm(0.5*(1-level),lower.tail = F)
+  for (i in 1:kk){
+    sei <- sqrt(delta[i,,drop=F]%*%varCov%*%t(delta[i,,drop=F]))
+    lci[i] <- est[i]-zz*sei
+    uci[i] <- est[i]+zz*sei
+  }
+  return(list(est=est,lower=lci,upper=uci))
+}
+
+occupancy_prob_delta = function(state, time, param, graph, xval = NULL){
+  edge_mats = edge_matrices(graph)
+  names_surv_dens = names_of_survival_density(graph)
+  
+  state_ord = state_ordering(graph)
+  absorbing_states <- sort(state_ord$order[which(state_ord$type=="abs")])
+  
+  f_types = construct_formula_types(graph)
+  f_types_match = f_types[which(substr(f_types,nchar(f_types),nchar(f_types)) == state)]
+  mm <- length(f_types_match)
+  
+  kk <- length(time)
+  op <-  matrix(0,kk,length(param))
+  for (i in 1:mm){
+    f_type = f_types_match[i]
+    integrand = eval(parse(text=type_to_integrand(f_type,edge_mats, names_surv_dens,abs_exact=FALSE))) # always with abs_exact=FALSE
+    
+    choice <- (length(which(edge_mats$passedBy[f_type,]==max(edge_mats$traveled[f_type,])))>0)  #TRUE: if absorbing state is reached from a state where there was an option to go a different way
+    
+    if (substr(f_type,nchar(f_type),nchar(f_type)) %in% absorbing_states & choice==FALSE){ #if patient is observed in absorbing state
+      dim_int <- nchar(f_type)-2  
+    }else{ #if patient has not reached absorbing state, or has reached it from a node with a choice
+      dim_int <- nchar(f_type)-1 
+    }
+    
+    opi <-  matrix(0,kk,length(param))
+    for (j in 1:kk){
+      lower <- rep(0,dim_int)
+      upper <- rep(time[j],dim_int)
+      tmax <- c(time[j],-1)
+      
+      if(length(lower) == 0){
+        opi[j,] = pracma::grad(integrand,x0=param,times=1,tt = tmax[1], tt2=tmax[2],x = xval) # the value of times does not matter
+      }else if(length(lower)>0){
+        if(length(lower)<=2 ){
+          opi[j,] = pracma::grad(repintegrate,x0=param,innerfunc=integrand,tt = tmax[1], tt2=tmax[2],lower=lower,upper = upper,x = xval)
+          
+        }else if (length(lower)>2){
+          #opi[j,] = cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
+          #                      tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
+          print("not ready yet")
+        }
+      }
+    }
+    op = op + opi
+  }
+  return(op)
+}
 
 
 #' Compute the overall survival
@@ -230,3 +321,64 @@ overall_survival = function(time, param, graph, xval = NULL){
   return(op)
 }
 
+#' Compute uncertainty bands
+#' 
+overall_survival_ci_band <- function(time,param,graph,xval,hessian,level=0.95){
+  est <- overall_survival(time=time,param=param,graph=graph,xval=xval)
+  delta <- overall_survival_delta(time=time,param=param,graph=graph,xval=xval)
+  varCov <- solve(hessian)
+  kk <- length(time)
+  lci <- rep(NA,kk)
+  uci <- rep(NA,kk)
+  zz <- qnorm(0.5*(1-level),lower.tail = F)
+  for (i in 1:kk){
+    sei <- sqrt(delta[i,,drop=F]%*%varCov%*%t(delta[i,,drop=F]))
+    lci[i] <- est[i]-zz*sei
+    uci[i] <- est[i]+zz*sei
+  }
+  return(list(est=est,lower=lci,upper=uci))
+}
+
+overall_survival_delta = function(time, param, graph, xval = NULL){
+  edge_mats = edge_matrices(graph)
+  names_surv_dens = names_of_survival_density(graph)
+  
+  state_ord = state_ordering(graph)
+  absorbing_states <- sort(state_ord$order[which(state_ord$type=="abs")])
+  
+  f_types = construct_formula_types(graph)
+  f_types_match = f_types[which(!(substr(f_types,nchar(f_types),nchar(f_types)) %in% absorbing_states))]
+  mm <- length(f_types_match)
+  
+  kk <- length(time)
+  op <- matrix(0,kk,length(param))
+  for (i in 1:mm){
+    f_type = f_types_match[i]
+    integrand = eval(parse(text=type_to_integrand(f_type,edge_mats, names_surv_dens,abs_exact=FALSE))) # always with abs_exact=FALSE
+    
+    dim_int <- nchar(f_type)-1 
+    
+    opi <- matrix(0,kk,length(param))
+    for (j in 1:kk){
+      lower <- rep(0,dim_int)
+      upper <- rep(time[j],dim_int)
+      tmax <- c(time[j],-1)
+      
+      if(length(lower) == 0){
+        opi[j,] = pracma::grad(integrand,x0=param,times=1,tt = tmax[1], tt2=tmax[2], x=xval)
+      }else if(length(lower)>0){
+        if(length(lower)<=2 ){
+          opi[j,] = pracma::grad(repintegrate,x0=param,innerfunc=integrand,tt = tmax[1], tt2=tmax[2],lower=lower,upper = upper,x = xval)
+          
+        }else if (length(lower)>2){
+          #opi[j,] = pracma::grad(cubintegrate,x0=param,f=integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
+          #                      tt = tmax[1], tt2=tmax[2], x = xval)
+          #needs to put cubintegrate in a separate function
+          print("not ready yet")
+        }
+      }
+    }
+    op = op + opi
+  }
+  return(op)
+}

@@ -37,17 +37,17 @@ dXweibull <- function(tt,a,b,th){
 }
 
 # Model:
-S_01 = function(param, x, t){(1-pXweibull(t,exp(param[1]),exp(param[2]+param[3]*x[1]+param[4]*x[2]),exp(param[21])))}
-S_12 = function(param, x, t){(1-pXweibull(t,exp(param[5]),exp(param[6]+param[7]*x[1]+param[8]*x[2]),exp(param[22])))}
-S_23 = function(param, x, t){(1-pXweibull(t,exp(param[9]),exp(param[10]+param[11]*x[1]+param[12]*x[2]),exp(param[23])))}
-S_03 = function(param, x, t){(1-pXweibull(t,exp(param[13]),exp(param[14]+param[15]*x[1]+param[16]*x[2]),exp(param[24])))}
-S_13 = function(param, x, t){(1-pXweibull(t,exp(param[17]),exp(param[18]+param[19]*x[1]+param[20]*x[2]),exp(param[25])))}
+S_01 = function(param, x, t){(1-pXweibull(t,exp(param[1]),exp(param[2]+param[3]*x[1]+param[4]*x[2]),exp(param[19])))}
+S_12 = function(param, x, t){(1-pXweibull(t,exp(param[5]),exp(param[6]+param[7]*x[1]+param[8]*x[2]),exp(param[20])))}
+S_23 = function(param, x, t){(1-pXweibull(t,exp(param[9]),exp(param[10]+param[11]*x[1]+param[12]*x[2]),exp(param[22])))}
+S_03 = function(param, x, t){(1-pXweibull(t,exp(param[13]),exp(param[14]+param[15]*x[1]),exp(param[22])))}
+S_13 = function(param, x, t){(1-pXweibull(t,exp(param[16]),exp(param[17]+param[18]*x[1]),exp(param[23])))}
 
-f_01 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[1]),exp(param[2]+param[3]*x[1]+param[4]*x[2]),exp(param[21]))}
-f_12 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[5]),exp(param[6]+param[7]*x[1]+param[8]*x[2]),exp(param[22]))}
-f_23 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[9]),exp(param[10]+param[11]*x[1]+param[12]*x[2]),exp(param[23]))}
-f_03 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[13]),exp(param[14]+param[15]*x[1]+param[16]*x[2]),exp(param[24]))}
-f_13 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[17]),exp(param[18]+param[19]*x[1]+param[20]*x[2]),exp(param[25]))}
+f_01 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[1]),exp(param[2]+param[3]*x[1]+param[4]*x[2]),exp(param[19]))}
+f_12 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[5]),exp(param[6]+param[7]*x[1]+param[8]*x[2]),exp(param[20]))}
+f_23 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[9]),exp(param[10]+param[11]*x[1]+param[12]*x[2]),exp(param[21]))}
+f_03 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[13]),exp(param[14]+param[15]*x[1]),exp(param[22]))}
+f_13 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[16]),exp(param[17]+param[18]*x[1]),exp(param[23]))}
 
 
 ## Part 3: From the time points of a given patient to an integral
@@ -81,8 +81,11 @@ for(i in 1:nrow(all_data_set)){
   integrand[[i]] = integrand_mellomregn
 }
 
-params <- c(0.41,2.3,-0.14,-0.327,0.25,1.11,0.17,-0.22,-0.01,0.92,0.09,0.43,-0.92,7.6,-1.59,-0.36,-1.08,4.88,1.89,-1.16,
-            rep(0,5))
+params <- c(0.34784701,2.52621502,-0.14892845,-0.29490633,-0.05209313,4.84311946,
+            0.19968936,-0.28632690,-0.49958056,6.64122178,0.12169109,0.40170468,
+            -0.54523069,0.66891295,-1.73124666,-2.04755639,4.59824638,
+            4.75956540,-0.25620822,-3.18974878,-3.18017775,2.51101361,
+            0.90323822)
 
 mloglikelihood(params,integrand,all_integral_limits,method1 = "hcubature",X=X_data_set,mc_cores=1)
 
@@ -98,12 +101,13 @@ system.time({
 #[10] 766.030   1.129   1.494   0.580   1.952   0.177   0.443   0.129  99.310
 #[19] 116.695   0.194   0.774   0.041   0.042  12.317   2.468
 
-
+hessian = pracma::hessian(mloglikelihood, params, integrand = integrand,limits = all_integral_limits,
+                                      mc_cores=10,X=X_data_set)
 
 aa <- c(0.34784701,2.52621502,-0.14892845,-0.29490633,-0.05209313,4.84311946,
         0.19968936,-0.28632690,-0.49958056,6.64122178,0.12169109,0.40170468,
         -0.54523069,0.66891295,-1.73124666,-0.81331241,-2.04755639,4.59824638,
-        4.75956540,-1.63760565,-0.25620822,-3.18974878,-3.18017775,2.51101361,
+        4.75956540,-0.25620822,-3.18974878,-3.18017775,2.51101361,
         0.90323822)
         
 
