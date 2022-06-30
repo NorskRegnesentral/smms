@@ -122,7 +122,7 @@ est_ci = function(param, hessian,level=0.95,log=TRUE){
 
 #' Compute the occupancy probability over time
 #'
-#' ...
+#' The last state is often heavy to compute, but recall that is has to be equal to 1 minus the others
 #'
 #' @param state A string with a number indicating the state for which to compute the probability (in the ordered naming system). 
 #' @param time A vector of timepoints for which to compute the occupancy probability.
@@ -167,17 +167,17 @@ occupancy_prob = function(state, time, param, graph, xval = NULL){
         opi[j] = integrand(times=1,tt = tmax[1], tt2=tmax[2],param = param, x = xval) # the value of times does not matter
       }else if(length(lower)>0){
         if(length(lower)<=2 ){
-          opi[j] = repintegrate(integrand,tt = tmax[1], tt2=tmax[2],lower=lower,upper = upper, param = param, x = xval)
+          #opi[j] = repintegrate(integrand,tt = tmax[1], tt2=tmax[2],lower=lower,upper = upper, param = param, x = xval)
           
-          # opi[j] = tryCatch({
-          #   repintegrate(integrand,tt=tmax[1],tt2=tmax[2],lower=lower,upper = upper, param = param, 
-          #                x = xval)
-          # },error=function(cond){
-          #   integrand2 <- change_integrand(integrand)
-          #   llij = cubintegrate(integrand2, lower = lower,upper = upper, method = "divonne", maxEval = 500,
-          #                         tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
-          #   return(llij)
-          # })
+          opi[j] = tryCatch({
+            repintegrate(integrand,tt=tmax[1],tt2=tmax[2],lower=lower,upper = upper, param = param,
+                         x = xval)
+          },error=function(cond){
+            integrand2 <- change_integrand(integrand)
+            llij = cubintegrate(integrand2, lower = lower,upper = upper, method = "divonne", maxEval = 500,
+                                  tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
+            return(llij)
+          })
           
         }else if (length(lower)>2){
           opi[j] = cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
@@ -243,12 +243,19 @@ occupancy_prob_delta = function(state, time, param, graph, xval = NULL){
         opi[j,] = pracma::grad(integrand,x0=param,times=1,tt = tmax[1], tt2=tmax[2],x = xval) # the value of times does not matter
       }else if(length(lower)>0){
         if(length(lower)<=2 ){
-          opi[j,] = pracma::grad(repintegrate,x0=param,innerfunc=integrand,tt = tmax[1], tt2=tmax[2],lower=lower,upper = upper,x = xval)
+          #opi[j,] = pracma::grad(repintegrate,x0=param,innerfunc=integrand,tt = tmax[1], tt2=tmax[2],lower=lower,upper = upper,x = xval)
+          
+          opi[j,] = tryCatch({
+            pracma::grad(repintegrate,x0=param,innerfunc=integrand,tt=tmax[1],tt2=tmax[2],lower=lower,upper = upper,x = xval)
+          },error=function(cond){
+            integrand2 <- change_integrand(integrand)
+            llij = pracma::grad(cubint,x0=param,integrand=integrand2,lower = lower,upper = upper, tmax=tmax,xval=xval)
+            return(llij)
+          })
           
         }else if (length(lower)>2){
-          #opi[j,] = cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
-          #                      tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
-          print("not ready yet")
+          opi[j,] = pracma::grad(cubint,x0=param,integrand=integrand,lower = lower,upper = upper, tmax=tmax,xval=xval)
+          
         }
       }
     }
@@ -381,4 +388,10 @@ overall_survival_delta = function(time, param, graph, xval = NULL){
     op = op + opi
   }
   return(op)
+}
+
+###
+cubint <- function(integrand,lower,upper,tmax,param,xval){
+  cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
+               tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
 }

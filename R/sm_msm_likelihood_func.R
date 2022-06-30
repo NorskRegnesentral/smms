@@ -48,9 +48,9 @@ names_of_survival_density = function(graph){
 #'
 type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE){
   
-  travi <- edge_mats$traveled[form_type,]
-  passi <- edge_mats$passedBy[form_type,]
-  posi <- edge_mats$possible[form_type,]
+  travi <- edge_mats$traveled[form_type,,drop=F]
+  passi <- edge_mats$passedBy[form_type,,drop=F]
+  posi <- edge_mats$possible[form_type,,drop=F]
 
   density_names <- names_surv_dens$density_name
   surv_names <- names_surv_dens$survival_name
@@ -58,7 +58,7 @@ type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE)
   
   # Determine the integral dimension
   dim_integral <- max(travi)
-  intoAbs <- names(travi)[which.max(travi)] %in% edge_abs
+  intoAbs <- colnames(travi)[which.max(travi)] %in% edge_abs
   choice <- (length(which(passi==max(travi)))>0)   #TRUE: if absorbing state is reached from a state where there was an option to go a different way
   if (intoAbs){
     if(abs_exact==TRUE) dim_integral <- dim_integral-1
@@ -258,22 +258,22 @@ type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE)
 #'
 #'
 # Integrals over functions of 2 variables
-repint2 <- function(ss,innerfunc,tt,param,lower2,upper2,x,...){ #integrate over uu
+repint2 <- function(ss,innerfunc,tt,param,lower2,upper2,x,tt2=-1,...){ #integrate over uu
   mm <- length(ss)
   out <- rep(NA,mm)
   for (i in 1:mm){
     out[i] <- integrate(innerfunc,lower=max(lower2-ss[i],0),upper=upper2-ss[i],tt=tt,x=x,
-                        ss=ss[i],param=param)$value
+                        ss=ss[i],param=param,tt2=tt2)$value
   }
   return(out)
 } 
 # Integral over functions of 1 variable
-repintegrate <- function(innerfunc,tt,param,x,lower,upper,...){ #integrate over ss
+repintegrate <- function(innerfunc,tt,param,x,lower,upper,tt2=-1,...){ #integrate over ss
   if (length(lower)==1){
-    out <- integrate(innerfunc,lower=lower,upper=upper,tt=tt,param=param,x=x)$value
+    out <- integrate(innerfunc,lower=lower,upper=upper,tt=tt,param=param,x=x,tt2=tt2)$value
   }else{
     out <- integrate(repint2,innerfunc=innerfunc,lower=max(lower[1],0),upper=upper[1],tt=tt,param=param,x=x,
-                     lower2=lower[2],upper2=upper[2])$value
+                     lower2=lower[2],upper2=upper[2],tt2=tt2)$value
   }
   return(out)
 } 
@@ -353,10 +353,10 @@ finding_limits <- function(timepoints,form_type,edge_mats,absorbing_states,abs_e
         tmax = c(max(timepoints,na.rm=T),-1)
       }else{
         dim_int <- length(splitted_f_type)-2
-        if(is.na(seclast[2])){
+        if(is.na(seclast[length(seclast)])){
           tmax = c(max(timepoints,na.rm=T),-1)
         }else{
-          tmax = c(max(timepoints,na.rm=T),unlist(seclast[2]))
+          tmax = c(max(timepoints,na.rm=T),unlist(seclast[length(seclast)]))
         }
       }
     }
