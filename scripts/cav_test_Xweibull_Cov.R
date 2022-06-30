@@ -28,24 +28,26 @@ colnames(dd)[1:2] <- c("patient","time")
 
 # Density and survival function
 pXweibull <- function(tt,a,b,th){
-  exp(1-(1+(tt/b)^a)^(1/th))
+  pp <- 1-exp(1-(1+(tt/b)^a)^(1/th))
+  pp[tt<0] <- 0
+  return(pp)
 }
 dXweibull <- function(tt,a,b,th){
   (1/th)*(a/b)*(tt/b)^(a-1)*(1+(tt/b)^a)^(1/th-1)*exp(1-(1+(tt/b)^a)^(1/th))
 }
 
 # Model:
-S_01 = function(param, x, t){(as.numeric(t>=0))* (1-pXweibull(t,exp(param[1]),exp(param[2]+param[3]*x[1]+param[4]*x[2]),exp(param[21])))}
-S_12 = function(param, x, t){(as.numeric(t>=0))* (1-pXweibull(t,exp(param[5]),exp(param[6]+param[7]*x[1]+param[8]*x[2]),exp(param[22])))}
-S_23 = function(param, x, t){(as.numeric(t>=0))* (1-pXweibull(t,exp(param[9]),exp(param[10]+param[11]*x[1]+param[12]*x[2]),exp(param[23])))}
-S_03 = function(param, x, t){(as.numeric(t>=0))* (1-pXweibull(t,exp(param[13]),exp(param[14]+param[15]*x[1]+param[16]*x[2]),exp(param[24])))}
-S_13 = function(param, x, t){(as.numeric(t>=0))* (1-pXweibull(t,exp(param[17]),exp(param[18]+param[19]*x[1]+param[20]*x[2]),exp(param[25])))}
+S_01 = function(param, x, t){(1-pXweibull(t,exp(param[1]),exp(param[2]+param[3]*x[1]+param[4]*x[2]),exp(param[19])))}
+S_12 = function(param, x, t){(1-pXweibull(t,exp(param[5]),exp(param[6]+param[7]*x[1]+param[8]*x[2]),exp(param[20])))}
+S_23 = function(param, x, t){(1-pXweibull(t,exp(param[9]),exp(param[10]+param[11]*x[1]+param[12]*x[2]),exp(param[22])))}
+S_03 = function(param, x, t){(1-pXweibull(t,exp(param[13]),exp(param[14]+param[15]*x[1]),exp(param[22])))}
+S_13 = function(param, x, t){(1-pXweibull(t,exp(param[16]),exp(param[17]+param[18]*x[1]),exp(param[23])))}
 
-f_01 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[1]),exp(param[2]+param[3]*x[1]+param[4]*x[2]),exp(param[21]))}
-f_12 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[5]),exp(param[6]+param[7]*x[1]+param[8]*x[2]),exp(param[22]))}
-f_23 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[9]),exp(param[10]+param[11]*x[1]+param[12]*x[2]),exp(param[23]))}
-f_03 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[13]),exp(param[14]+param[15]*x[1]+param[16]*x[2]),exp(param[24]))}
-f_13 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[17]),exp(param[18]+param[19]*x[1]+param[20]*x[2]),exp(param[25]))}
+f_01 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[1]),exp(param[2]+param[3]*x[1]+param[4]*x[2]),exp(param[19]))}
+f_12 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[5]),exp(param[6]+param[7]*x[1]+param[8]*x[2]),exp(param[20]))}
+f_23 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[9]),exp(param[10]+param[11]*x[1]+param[12]*x[2]),exp(param[21]))}
+f_03 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[13]),exp(param[14]+param[15]*x[1]),exp(param[22]))}
+f_13 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[16]),exp(param[17]+param[18]*x[1]),exp(param[23]))}
 
 
 ## Part 3: From the time points of a given patient to an integral
@@ -79,11 +81,19 @@ for(i in 1:nrow(all_data_set)){
   integrand[[i]] = integrand_mellomregn
 }
 
+<<<<<<< HEAD
 params <- log(c(1.4,3,0.21,1.65,1.2,3,0.8,1.2,
                 1.1,3.7,0.9,0.6,
                 0.4,4,1.6,1.3,
                 0.71,3,0.34,3,rep(1,5)))
 
+=======
+params <- c(0.34784701,2.52621502,-0.14892845,-0.29490633,-0.05209313,4.84311946,
+            0.19968936,-0.28632690,-0.49958056,6.64122178,0.12169109,0.40170468,
+            -0.54523069,0.66891295,-1.73124666,-2.04755639,4.59824638,
+            4.75956540,-0.25620822,-3.18974878,-3.18017775,2.51101361,
+            0.90323822)
+>>>>>>> 6a1a272fc13402b06ec936d7f0558d58aad138c6
 
 mloglikelihood(params,integrand,all_integral_limits,method1 = "hcubature",X=X_data_set,mc_cores=1)
 
@@ -92,28 +102,22 @@ system.time({
                mc_cores=10,X=X_data_set,lower=rep(-50,length(params)),upper=rep(50,length(params)))
 })
 2*oo$objective
-# 2455.507
+# 2725.521
 
-#round(exp(oo$par),3)
-#[1]    0.561 2644.084    0.781    0.997    0.490   22.633    0.949    0.908
-#[9]    0.418  140.696    0.993    1.393    0.755    1.270    1.178    0.689
-#[17]    1.453    0.129    0.539    4.033    0.029    0.262    0.173    0.140
-#[25]    0.143
+#> round(exp(oo$par),3)
+#[1]   1.416  12.506   0.862   0.745   0.949 126.864   1.221   0.751   0.607
+#[10] 766.030   1.129   1.494   0.580   1.952   0.177   0.443   0.129  99.310
+#[19] 116.695   0.194   0.774   0.041   0.042  12.317   2.468
 
+hessian = pracma::hessian(mloglikelihood, params, integrand = integrand,limits = all_integral_limits,
+                                      mc_cores=10,X=X_data_set)
 
-
-################# kjoer opp til hit ####################
-
-# 2821.21
-
-# With covariates on the scale parameter
-2*oo$objective #2736.213
-## time: 3728 seconds (1 hour)
-#$par
-#[1]    1.48463435   10.03962215   -0.14239643   -0.32672465    1.28785513    3.02294341    0.17143335   -0.21878803    0.99196746
-#[10]    2.49930581    0.09261627    0.42692674    0.40632560 1959.80580907   -1.58964871   -0.35546076    0.34401393  132.18420920
-#[19]    1.89155808   -1.15943047
-aa <- c(1.48,10.04,-0.14,-0.327,1.29,3.02,0.17,-0.22,0.99,2.50,0.09,0.43,0.41,1959.81,-1.59,-0.36,0.34,132.18,1.89,-1.16)
+aa <- c(0.34784701,2.52621502,-0.14892845,-0.29490633,-0.05209313,4.84311946,
+        0.19968936,-0.28632690,-0.49958056,6.64122178,0.12169109,0.40170468,
+        -0.54523069,0.66891295,-1.73124666,-0.81331241,-2.04755639,4.59824638,
+        4.75956540,-0.25620822,-3.18974878,-3.18017775,2.51101361,
+        0.90323822)
+        
 
 
 ######################## Plots #################################
@@ -129,7 +133,7 @@ h_13 = function(tt,x,param){f_13(param,x,tt)/S_13(param,x,tt)}
 ## Plot fitted hazard functions
 tval <- seq(0,20,length=500)
 
-pdf("cav_weibull_cov_hazard.pdf", width=11, height=7)
+pdf("cav_Xweibull_cov_hazard.pdf", width=11, height=7)
 par(mfrow=c(2,3))
 par(bty="l")
 par(mar=c(4,4,1,2))
@@ -138,30 +142,30 @@ plot(tval,h_01(tval,c(-1,0),aa),type="l",ylim=c(0,1),col="#0571b0",lwd=3,xlab=" 
 lines(tval,h_01(tval,c(-1,1),aa),col="#ca0020",lwd=3)
 lines(tval,h_01(tval,c(1,0),aa),col="#0571b0",lwd=3,lty=2)
 lines(tval,h_01(tval,c(1,1),aa),col="#ca0020",lwd=3,lty=2)
-legend("topright",legend=c("youger donor, no IHD","youger donor, IHD","older donor, no IHD","older donor, IHD"),
-       col=c("#0571b0","#ca0020","#0571b0","#ca0020"),lwd=2,bty="n",lty=c(1,1,2,2),cex=0.7)
+#legend("topright",legend=c("youger donor, no IHD","youger donor, IHD","older donor, no IHD","older donor, IHD"),
+#       col=c("#0571b0","#ca0020","#0571b0","#ca0020"),lwd=2,bty="n",lty=c(1,1,2,2),cex=0.7)
 
-plot(tval,h_12(tval,c(-1,0),aa),type="l",ylim=c(0,1),col="#0571b0",lwd=3,xlab=" ",ylab="hazard",main="1 -> 2")
+plot(tval,h_12(tval,c(-1,0),aa),type="l",ylim=c(0,3.5),col="#0571b0",lwd=3,xlab=" ",ylab="hazard",main="1 -> 2")
 lines(tval,h_12(tval,c(-1,1),aa),col="#ca0020",lwd=3)
 lines(tval,h_12(tval,c(1,0),aa),col="#0571b0",lwd=3,lty=2)
 lines(tval,h_12(tval,c(1,1),aa),col="#ca0020",lwd=3,lty=2)
-legend("bottomright",legend=c("youger donor, no IHD","youger donor, IHD","older donor, no IHD","older donor, IHD"),
-       col=c("#0571b0","#ca0020","#0571b0","#ca0020"),lwd=2,bty="n",lty=c(1,1,2,2),cex=0.7)
+#legend("bottomright",legend=c("youger donor, no IHD","youger donor, IHD","older donor, no IHD","older donor, IHD"),
+#       col=c("#0571b0","#ca0020","#0571b0","#ca0020"),lwd=2,bty="n",lty=c(1,1,2,2),cex=0.7)
 
-plot(tval,h_23(tval,c(-1,0),aa),type="l",ylim=c(0,1),col="#0571b0",lwd=3,xlab="years after entering state",ylab="hazard",main="2 -> 3")
+plot(tval,h_23(tval,c(-1,0),aa),type="l",ylim=c(0,2),col="#0571b0",lwd=3,xlab="years after entering state",ylab="hazard",main="2 -> 3")
 lines(tval,h_23(tval,c(-1,1),aa),col="#ca0020",lwd=3)
 lines(tval,h_23(tval,c(1,0),aa),col="#0571b0",lwd=3,lty=2)
 lines(tval,h_23(tval,c(1,1),aa),col="#ca0020",lwd=3,lty=2)
-legend("topright",legend=c("youger donor, no IHD","youger donor, IHD","older donor, no IHD","older donor, IHD"),
-       col=c("#0571b0","#ca0020","#0571b0","#ca0020"),lwd=2,bty="n",lty=c(1,1,2,2),cex=0.7)
+#legend("topright",legend=c("youger donor, no IHD","youger donor, IHD","older donor, no IHD","older donor, IHD"),
+#       col=c("#0571b0","#ca0020","#0571b0","#ca0020"),lwd=2,bty="n",lty=c(1,1,2,2),cex=0.7)
 
 
 plot(tval,h_03(tval,c(-1,0),aa),type="l",ylim=c(0,0.8),col="#0571b0",lwd=3,xlab="years after entering state",ylab="hazard",main="0 -> 3")
 lines(tval,h_03(tval,c(-1,1),aa),col="#ca0020",lwd=3)
 lines(tval,h_03(tval,c(1,0),aa),col="#0571b0",lwd=3,lty=2)
 lines(tval,h_03(tval,c(1,1),aa),col="#ca0020",lwd=3,lty=2)
-legend("topright",legend=c("youger donor, no IHD","youger donor, IHD","older donor, no IHD","older donor, IHD"),
-       col=c("#0571b0","#ca0020","#0571b0","#ca0020"),lwd=2,bty="n",lty=c(1,1,2,2),cex=0.7)
+#legend("topright",legend=c("youger donor, no IHD","youger donor, IHD","older donor, no IHD","older donor, IHD"),
+#       col=c("#0571b0","#ca0020","#0571b0","#ca0020"),lwd=2,bty="n",lty=c(1,1,2,2),cex=0.7)
 
 
 plot(tval,h_13(tval,c(-1,0),aa),type="l",ylim=c(0,1),col="#0571b0",lwd=3,xlab="years after entering state",ylab="hazard",main="1 -> 3")
@@ -177,22 +181,22 @@ dev.off()
 
 ## Occupancy probabilities
 tval <- seq(0.01,30,length=100)
-p0_y0 <- occupancy_prob("0",tval,params,gg,xval=c(-1,0))
-p0_y1 <- occupancy_prob("0",tval,params,gg,xval=c(-1,1))
-p0_o0 <- occupancy_prob("0",tval,params,gg,xval=c(1,0))
-p0_o1 <- occupancy_prob("0",tval,params,gg,xval=c(1,1))
-p1_y0 <- occupancy_prob("1",tval,params,gg,xval=c(-1,0))
-p1_y1 <- occupancy_prob("1",tval,params,gg,xval=c(-1,1))
-p1_o0 <- occupancy_prob("1",tval,params,gg,xval=c(1,0))
-p1_o1 <- occupancy_prob("1",tval,params,gg,xval=c(1,1))
-p2_y0 <- occupancy_prob("2",tval,params,gg,xval=c(-1,0))
-p2_y1 <- occupancy_prob("2",tval,params,gg,xval=c(-1,1))
-p2_o0 <- occupancy_prob("2",tval,params,gg,xval=c(1,0))
-p2_o1 <- occupancy_prob("2",tval,params,gg,xval=c(1,1))
-p3_y0 <- occupancy_prob("3",tval,params,gg,xval=c(-1,0))
-p3_y1 <- occupancy_prob("3",tval,params,gg,xval=c(-1,1))
-p3_o0 <- occupancy_prob("3",tval,params,gg,xval=c(1,0))
-p3_o1 <- occupancy_prob("3",tval,params,gg,xval=c(1,1))
+p0_y0 <- occupancy_prob("0",tval,aa,gg,xval=c(-1,0))
+p0_y1 <- occupancy_prob("0",tval,aa,gg,xval=c(-1,1))
+p0_o0 <- occupancy_prob("0",tval,aa,gg,xval=c(1,0))
+p0_o1 <- occupancy_prob("0",tval,aa,gg,xval=c(1,1))
+p1_y0 <- occupancy_prob("1",tval,aa,gg,xval=c(-1,0))
+p1_y1 <- occupancy_prob("1",tval,aa,gg,xval=c(-1,1))
+p1_o0 <- occupancy_prob("1",tval,aa,gg,xval=c(1,0))
+p1_o1 <- occupancy_prob("1",tval,aa,gg,xval=c(1,1))
+p2_y0 <- occupancy_prob("2",tval,aa,gg,xval=c(-1,0))
+p2_y1 <- occupancy_prob("2",tval,aa,gg,xval=c(-1,1))
+p2_o0 <- occupancy_prob("2",tval,aa,gg,xval=c(1,0))
+p2_o1 <- occupancy_prob("2",tval,aa,gg,xval=c(1,1))
+p3_y0 <- occupancy_prob("3",tval,aa,gg,xval=c(-1,0))
+p3_y1 <- occupancy_prob("3",tval,aa,gg,xval=c(-1,1))
+p3_o0 <- occupancy_prob("3",tval,aa,gg,xval=c(1,0))
+p3_o1 <- occupancy_prob("3",tval,aa,gg,xval=c(1,1))
 
 plot(tval,p0_y0+p1_y0+p2_y0+p3_y0,type="l")
 plot(tval,p0_y1+p1_y1+p2_y1+p3_y1,type="l")
@@ -211,7 +215,7 @@ prev_o0 <- prevalence.msm(cav.msm,times=tval,covariates=list(dage_st=1,ihdTRUE=0
 prev_o1 <- prevalence.msm(cav.msm,times=tval,covariates=list(dage_st=1,ihdTRUE=1))
 
 
-pdf("cav_weibull_cov_prevalence.pdf", width=11, height=7)
+pdf("cav_Xweibull_cov_prevalence.pdf", width=13, height=7)
 par(mfrow=c(2,2))
 par(bty="l")
 par(mar=c(4,4,1,2))
@@ -222,10 +226,10 @@ lines(tval,p0_y0*100,col="#0571b0",lwd=3)
 lines(tval,p0_y1*100,col="#ca0020",lwd=3)
 lines(tval,p0_o0*100,col="#0571b0",lwd=3,lty=2)
 lines(tval,p0_o1*100,col="#ca0020",lwd=3,lty=2)
-lines(tval,prev_y0$`Expected percentages`[,1],col="#0571b0",lwd=1)
-lines(tval,prev_y1$`Expected percentages`[,1],col="#ca0020",lwd=1)
-lines(tval,prev_o0$`Expected percentages`[,1],col="#0571b0",lwd=1,lty=2)
-lines(tval,prev_o1$`Expected percentages`[,1],col="#ca0020",lwd=1,lty=2)
+#lines(tval,prev_y0$`Expected percentages`[,1],col="#0571b0",lwd=1)
+# lines(tval,prev_y1$`Expected percentages`[,1],col="#ca0020",lwd=1)
+# lines(tval,prev_o0$`Expected percentages`[,1],col="#0571b0",lwd=1,lty=2)
+# lines(tval,prev_o1$`Expected percentages`[,1],col="#ca0020",lwd=1,lty=2)
 
 plot(tval,prev_y0$`Observed percentages`[,2],type="l",col="dark grey",ylim=c(0,100),lwd=3,xlab=" ",
      ylab="prevalence (%)",main="State 1")
@@ -233,12 +237,12 @@ lines(tval,p1_y0*100,col="#0571b0",lwd=3)
 lines(tval,p1_y1*100,col="#ca0020",lwd=3)
 lines(tval,p1_o0*100,col="#0571b0",lwd=3,lty=2)
 lines(tval,p1_o1*100,col="#ca0020",lwd=3,lty=2)
-lines(tval,prev_y0$`Expected percentages`[,2],col="#0571b0",lwd=1)
-lines(tval,prev_y1$`Expected percentages`[,2],col="#ca0020",lwd=1)
-lines(tval,prev_o0$`Expected percentages`[,2],col="#0571b0",lwd=1,lty=2)
-lines(tval,prev_o1$`Expected percentages`[,2],col="#ca0020",lwd=1,lty=2)
+# lines(tval,prev_y0$`Expected percentages`[,2],col="#0571b0",lwd=1)
+# lines(tval,prev_y1$`Expected percentages`[,2],col="#ca0020",lwd=1)
+# lines(tval,prev_o0$`Expected percentages`[,2],col="#0571b0",lwd=1,lty=2)
+# lines(tval,prev_o1$`Expected percentages`[,2],col="#ca0020",lwd=1,lty=2)
 legend("topright",legend=c("youger donor, no IHD","youger donor, IHD","older donor, no IHD","older donor, IHD"),
-       col=c("#0571b0","#ca0020","#0571b0","#ca0020"),lwd=2,bty="n",lty=c(1,1,2,2),cex=0.7)
+       col=c("#0571b0","#ca0020","#0571b0","#ca0020"),lwd=2,bty="n",lty=c(1,1,2,2),cex=1)
 
 #legend("topright",legend=c("no IHD","IHD","older donor, no IHD","older donor, IHD"),
 #       col=c("#0571b0","#ca0020","black","#ca0020"),lwd=2,bty="n",lty=c(1,1,2,2),cex=0.7)
@@ -249,10 +253,10 @@ lines(tval,p2_y0*100,col="#0571b0",lwd=3)
 lines(tval,p2_y1*100,col="#ca0020",lwd=3)
 lines(tval,p2_o0*100,col="#0571b0",lwd=3,lty=2)
 lines(tval,p2_o1*100,col="#ca0020",lwd=3,lty=2)
-lines(tval,prev_y0$`Expected percentages`[,3],col="#0571b0",lwd=1)
-lines(tval,prev_y1$`Expected percentages`[,3],col="#ca0020",lwd=1)
-lines(tval,prev_o0$`Expected percentages`[,3],col="#0571b0",lwd=1,lty=2)
-lines(tval,prev_o1$`Expected percentages`[,3],col="#ca0020",lwd=1,lty=2)
+# lines(tval,prev_y0$`Expected percentages`[,3],col="#0571b0",lwd=1)
+# lines(tval,prev_y1$`Expected percentages`[,3],col="#ca0020",lwd=1)
+# lines(tval,prev_o0$`Expected percentages`[,3],col="#0571b0",lwd=1,lty=2)
+# lines(tval,prev_o1$`Expected percentages`[,3],col="#ca0020",lwd=1,lty=2)
 
 plot(tval,prev_y0$`Observed percentages`[,4],type="l",col="dark grey",ylim=c(0,100),lwd=3,xlab="years after transplantation",
      ylab="prevalence (%)",main="State 3")
@@ -260,33 +264,22 @@ lines(tval,p3_y0*100,col="#0571b0",lwd=3)
 lines(tval,p3_y1*100,col="#ca0020",lwd=3)
 lines(tval,p3_o0*100,col="#0571b0",lwd=3,lty=2)
 lines(tval,p3_o1*100,col="#ca0020",lwd=3,lty=2)
-lines(tval,prev_y0$`Expected percentages`[,4],col="#0571b0",lwd=1)
-lines(tval,prev_y1$`Expected percentages`[,4],col="#ca0020",lwd=1)
-lines(tval,prev_o0$`Expected percentages`[,4],col="#0571b0",lwd=1,lty=2)
-lines(tval,prev_o1$`Expected percentages`[,4],col="#ca0020",lwd=1,lty=2)
+# lines(tval,prev_y0$`Expected percentages`[,4],col="#0571b0",lwd=1)
+# lines(tval,prev_y1$`Expected percentages`[,4],col="#ca0020",lwd=1)
+# lines(tval,prev_o0$`Expected percentages`[,4],col="#0571b0",lwd=1,lty=2)
+# lines(tval,prev_o1$`Expected percentages`[,4],col="#ca0020",lwd=1,lty=2)
 dev.off()
 
 
-#### Overall survival: needs to be reimplemented!
-S_total <- function(tt,param,x){
-  nn <- length(tt)
-  pp <- rep(NA,nn)
-  for (i in 1:nn){
-    pp[i] <- (S_01(param,x,tt[i])*S_03(param,x,tt[i]) + 
-                int1(f01_S12_S03_S13,teval=tt[i],param=param,x=x,tlim1=0,tlim2=tt[i],tlim1_l2=NA,tlim2_l2=NA) +
-                int1(f01_f12_S23_S03_S13,teval=tt[i],param=param,x=x,tlim1=0,tlim2=tt[i],tlim1_l2=0,tlim2_l2=tt[i])) 
-  }
-  return(pp)
-}
-
-tval <- seq(0,30,length=100)
-Sy0 <- S_total(tval,aa,c(-1,0))
-Sy1 <- S_total(tval,aa,c(-1,1))
-So0 <- S_total(tval,aa,c(1,0))
-So1 <- S_total(tval,aa,c(1,1))
+#### Overall survival: 
+tval <- seq(0.01,30,length=100)
+Sy0 <- overall_survival(tval,aa,gg,c(-1,0))
+Sy1 <- overall_survival(tval,aa,gg,c(-1,1))
+So0 <- overall_survival(tval,aa,gg,c(1,0))
+So1 <- overall_survival(tval,aa,gg,c(1,1))
 
 plot.survfit.msm(cav.msm, col.surv="black",lwd.surv=2,xlab="years after transplantation",
-                 ylab="survival",main=" ",legend.pos=None,col="#ca0020",lwd=3,covariates=list(dage_st=-1,ihdTRUE=0))
+                 ylab="survival",main=" ",legend.pos=None,col="grey",lwd=3,covariates=list(dage_st=-1,ihdTRUE=0))
 
 pdf("cav_weibull_cov_survival.pdf", width=11, height=7)
 par(mfrow=c(1,1))
