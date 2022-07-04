@@ -1,0 +1,12 @@
+cff-version: 1.0.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Aastveit"
+  given-names: "Marthe"
+- family-names: "Cunen"
+  given-names: "Céline"
+  orcid: "https://orcid.org/0000-0002-8215-3080"
+title: "smms: Semi-Markov Multi-State models for interval censored data"
+version: 0.0.0.9000
+date-released: 2022-09-01
+url: "https://github.com/NorskRegnesentral/smms/"
