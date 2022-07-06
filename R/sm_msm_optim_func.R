@@ -391,11 +391,4 @@ overall_survival_delta = function(time, param, graph, xval = NULL){
   return(op)
 }
 
-<<<<<<< HEAD
-=======
-###
-cubint <- function(integrand,lower,upper,tmax,param,xval){
-  cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
-               tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
-}
->>>>>>> 6a1a272fc13402b06ec936d7f0558d58aad138c6
+
