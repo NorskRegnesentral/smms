@@ -89,6 +89,7 @@ smms = function(startval, data, graph, X = NULL, mc_cores = 3){
                               mc_cores=mc_cores,X=X)
   return(list(optimizer, hessian_optimizer))
 }
+
 #optim_func(params = params, dd, gg)
 
 
@@ -390,8 +391,4 @@ overall_survival_delta = function(time, param, graph, xval = NULL){
   return(op)
 }
 
-###
-cubint <- function(integrand,lower,upper,tmax,param,xval){
-  cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
-               tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
-}
+
