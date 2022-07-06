@@ -211,3 +211,23 @@ for (k in 1:6){
 }
 
 save(ctimes,file="comp_times_exp1")
+
+
+############ Plot #############
+load("comp_times_exp1")
+
+pdf("timing_exp1.pdf", width=13, height=7)
+par(bty="l")
+par(mar=c(4,4,1,2))
+par(cex=1)
+plot(ctimes$int_dim[ctimes$num_par=="1"],ctimes$otime[ctimes$num_par=="1"],ylim=c(-10,190),type="b",ylab="time (in seconds)",xlab="integral dimension",
+     lwd=3,col="#a6cee3")
+points(ctimes$int_dim[ctimes$num_par=="+1"],ctimes$otime[ctimes$num_par=="+1"],col="#1f78b4",type="b",pch=3,lwd=3)
+points(ctimes$int_dim[ctimes$num_par=="2"],ctimes$otime[ctimes$num_par=="2"],col="#33a02c",type="b",pch=4,lwd=3)
+legend("topleft",legend=c("1 param. per trans.","1 param. per trans. + 1","2 param. per trans."),
+       col=c("#a6cee3","#1f78b4","#33a02c"),lwd=2,bty="n",lty=c(1,1,1),pch=c(1,3,4),cex=1)
+text(ctimes$int_dim[ctimes$num_par=="1"],ctimes$otime[ctimes$num_par=="1"]-9,labels=paste(1:6),col="#a6cee3")
+text(ctimes$int_dim[ctimes$num_par=="+1"],ctimes$otime[ctimes$num_par=="+1"]+9,labels=paste(2:7),col="#1f78b4")
+text(ctimes$int_dim[ctimes$num_par=="2"],ctimes$otime[ctimes$num_par=="2"]+c(18,18,rep(9,4)),labels=paste(1:6*2),col="#33a02c")
+dev.off()
+
