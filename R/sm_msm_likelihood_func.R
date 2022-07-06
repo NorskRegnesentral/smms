@@ -435,6 +435,7 @@ finding_limits <- function(timepoints,form_type,edge_mats,absorbing_states,abs_e
 #' 
 mloglikelihood <-  function(param,integrand,limits, X = NULL,method1 = "hcubature",mc_cores = 2){
   # Test that limits and integrand have same length
+  
   final_integral = sum(unlist(mclapply(1:length(integrand), function(i){
     mm <- length(limits[[i]])
     lli <- rep(NA,mm)
