@@ -1,5 +1,5 @@
 #### CAV example for testing
-### Generalised Weibull model with covariates (to see that we get the same as Jackson)
+### Generalised Weibull model with covariates 
 setwd("H:/Multistate models/SemiMarkovMultistate")
 rm(list = ls())
 devtools::load_all() 
@@ -37,17 +37,17 @@ dXweibull <- function(tt,a,b,th){
 }
 
 # Model:
-S_01 = function(param, x, t){(1-pXweibull(t,exp(param[1]),exp(param[2]+param[3]*x[1]+param[4]*x[2]),exp(param[19])))}
-S_12 = function(param, x, t){(1-pXweibull(t,exp(param[5]),exp(param[6]+param[7]*x[1]+param[8]*x[2]),exp(param[20])))}
-S_23 = function(param, x, t){(1-pXweibull(t,exp(param[9]),exp(param[10]+param[11]*x[1]+param[12]*x[2]),exp(param[22])))}
-S_03 = function(param, x, t){(1-pXweibull(t,exp(param[13]),exp(param[14]+param[15]*x[1]),exp(param[22])))}
-S_13 = function(param, x, t){(1-pXweibull(t,exp(param[16]),exp(param[17]+param[18]*x[1]),exp(param[23])))}
+S_01 = function(param, x, t){(1-pXweibull(t,exp(param[1]),exp(param[2]+param[3]*x[1]+param[4]*x[2]),exp(param[21])))}
+S_12 = function(param, x, t){(1-pXweibull(t,exp(param[5]),exp(param[6]+param[7]*x[1]+param[8]*x[2]),exp(param[22])))}
+S_23 = function(param, x, t){(1-pXweibull(t,exp(param[9]),exp(param[10]+param[11]*x[1]+param[12]*x[2]),exp(param[23])))}
+S_03 = function(param, x, t){(1-pXweibull(t,exp(param[13]),exp(param[14]+param[15]*x[1]+param[16]*x[2]),exp(param[24])))}
+S_13 = function(param, x, t){(1-pXweibull(t,exp(param[17]),exp(param[18]+param[19]*x[1]+param[20]*x[2]),exp(param[25])))}
 
-f_01 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[1]),exp(param[2]+param[3]*x[1]+param[4]*x[2]),exp(param[19]))}
-f_12 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[5]),exp(param[6]+param[7]*x[1]+param[8]*x[2]),exp(param[20]))}
-f_23 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[9]),exp(param[10]+param[11]*x[1]+param[12]*x[2]),exp(param[21]))}
-f_03 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[13]),exp(param[14]+param[15]*x[1]),exp(param[22]))}
-f_13 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[16]),exp(param[17]+param[18]*x[1]),exp(param[23]))}
+f_01 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[1]),exp(param[2]+param[3]*x[1]+param[4]*x[2]),exp(param[21]))}
+f_12 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[5]),exp(param[6]+param[7]*x[1]+param[8]*x[2]),exp(param[22]))}
+f_23 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[9]),exp(param[10]+param[11]*x[1]+param[12]*x[2]),exp(param[23]))}
+f_03 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[13]),exp(param[14]+param[15]*x[1]+param[16]*x[2]),exp(param[24]))}
+f_13 = function(param, x, t){as.numeric(t>=0)*dXweibull(t,exp(param[17]),exp(param[18]+param[19]*x[1]+param[20]*x[2]),exp(param[25]))}
 
 
 ## Part 3: From the time points of a given patient to an integral
@@ -81,21 +81,21 @@ for(i in 1:nrow(all_data_set)){
   integrand[[i]] = integrand_mellomregn
 }
 
-params <- log(c(1.4,3,0.21,1.65,1.2,3,0.8,1.2,
-                1.1,3.7,0.9,0.6,
-                0.4,4,1.6,1.3,
-                0.71,3,0.34,3,rep(1,5)))
+params <- c(0.35646138,2.38374879,-0.18184979,-0.29895501,-0.07931777,7.13290107,0.23200583,
+            -0.32907360,-0.55447371,7.92286419,0.18041122,0.35831946,
+            -0.97996945,7.35177353,0,0,-2.3293713,15.69845138,0,0,
+            -0.09262983,-5.18016748,-3.73219154,0,0)
 
-params <- c(0.34784701,2.52621502,-0.14892845,-0.29490633,-0.05209313,4.84311946,
-            0.19968936,-0.28632690,-0.49958056,6.64122178,0.12169109,0.40170468,
-            -0.54523069,0.66891295,-1.73124666,-2.04755639,4.59824638,
-            4.75956540,-0.25620822,-3.18974878,-3.18017775,2.51101361,
-            0.90323822)
 mloglikelihood(params,integrand,all_integral_limits,method1 = "hcubature",X=X_data_set,mc_cores=1)
 
 system.time({
   oo <- nlminb(params,mloglikelihood,integrand = integrand,limits = all_integral_limits,
                mc_cores=10,X=X_data_set,lower=rep(-50,length(params)),upper=rep(50,length(params)))
+})
+
+system.time({
+  oo2 <- optim(params,mloglikelihood,integrand = integrand,limits = all_integral_limits,
+               mc_cores=10,X=X_data_set)
 })
 2*oo$objective
 # 2725.521
@@ -105,15 +105,27 @@ system.time({
 #[10] 766.030   1.129   1.494   0.580   1.952   0.177   0.443   0.129  99.310
 #[19] 116.695   0.194   0.774   0.041   0.042  12.317   2.468
 
-hessian = pracma::hessian(mloglikelihood, params, integrand = integrand,limits = all_integral_limits,
+hessian = pracma::hessian(mloglikelihood, oo$par, integrand = integrand,limits = all_integral_limits,
                                       mc_cores=10,X=X_data_set)
 
-aa <- c(0.34784701,2.52621502,-0.14892845,-0.29490633,-0.05209313,4.84311946,
-        0.19968936,-0.28632690,-0.49958056,6.64122178,0.12169109,0.40170468,
-        -0.54523069,0.66891295,-1.73124666,-0.81331241,-2.04755639,4.59824638,
-        4.75956540,-0.25620822,-3.18974878,-3.18017775,2.51101361,
-        0.90323822)
+hessian2 = numDeriv::hessian(mloglikelihood, oo$par, integrand = integrand,limits = all_integral_limits,
+                          mc_cores=10,X=X_data_set)
+
+aa <- c(0.35646138,2.38374879,-0.18184979,-0.29895501,-0.07931777,7.13290107,0.23200583,
+        -0.32907360,-0.55447371,7.92286419,0.18041122,0.35831946,
+        -0.97996945,7.35177353,0,0,-2.3293713,15.69845138,0,0,0,
+        -0.09262983,-5.18016748,-3.73219154,0,0)
         
+
+load("cav_Xweibull_cov_optims")
+
+aa <- oo$par
+
+est_ci(aa,hessian)
+
+exp(est_ci(aa,hessian))
+
+est_ci(aa,hessian,log=F)
 
 
 ######################## Plots #################################
@@ -176,7 +188,7 @@ dev.off()
 
 
 ## Occupancy probabilities
-tval <- seq(0.01,30,length=100)
+tval <- seq(0.01,30,length=50)
 p0_y0 <- occupancy_prob("0",tval,aa,gg,xval=c(-1,0))
 p0_y1 <- occupancy_prob("0",tval,aa,gg,xval=c(-1,1))
 p0_o0 <- occupancy_prob("0",tval,aa,gg,xval=c(1,0))
@@ -200,10 +212,10 @@ plot(tval,p0_o0+p1_o0+p2_o0+p3_o0,type="l")
 plot(tval,p0_o1+p1_o1+p2_o1+p3_o1,type="l")
 
 # msm package with covariates
-twoway4.q <- rbind(c(0, 0.25, 0, 0.25), c(0.166, 0, 0.166, 0.166),c(0, 0.25, 0, 0.25), c(0, 0, 0, 0))
-rownames(twoway4.q) <- colnames(twoway4.q) <- c("Well", "Mild","Severe", "Death")
+oneway4.q <- rbind(c(0, 0.25, 0, 0.25), c(0, 0, 0.25, 0.25),c(0, 0, 0, 0.5), c(0, 0, 0, 0))
+rownames(oneway4.q) <- colnames(oneway4.q) <- c("Well", "Mild","Severe", "Death")
 cav.msm <- msm(state ~ time, subject = patient, data = dd,covariates=~dage_st+ihd,
-               qmatrix = twoway4.q, death = 4,method = "BFGS", control = list(fnscale = 4000, maxit = 10000))
+               qmatrix = oneway4.q, death = 4,method = "BFGS", control = list(fnscale = 4000, maxit = 10000))
 
 prev_y0 <- prevalence.msm(cav.msm,times=tval,covariates=list(dage_st=-1,ihdTRUE=0))
 prev_y1 <- prevalence.msm(cav.msm,times=tval,covariates=list(dage_st=-1,ihdTRUE=1))
@@ -268,11 +280,11 @@ dev.off()
 
 
 #### Overall survival: 
-tval <- seq(0.01,30,length=100)
-Sy0 <- overall_survival(tval,aa,gg,c(-1,0))
-Sy1 <- overall_survival(tval,aa,gg,c(-1,1))
-So0 <- overall_survival(tval,aa,gg,c(1,0))
-So1 <- overall_survival(tval,aa,gg,c(1,1))
+tval <- seq(0.01,30,length=50)
+Sy0 <- overall_survival_ci_band(tval,aa,gg,c(-1,0),hessian)
+Sy1 <- overall_survival_ci_band(tval,aa,gg,c(-1,1),hessian)
+So0 <- overall_survival_ci_band(tval,aa,gg,c(1,0),hessian)
+So1 <- overall_survival_ci_band(tval,aa,gg,c(1,1),hessian)
 
 plot.survfit.msm(cav.msm, col.surv="black",lwd.surv=2,xlab="years after transplantation",
                  ylab="survival",main=" ",legend.pos=None,col="grey",lwd=3,covariates=list(dage_st=-1,ihdTRUE=0))
@@ -290,3 +302,4 @@ lines(tval,So1,col="#ca0020",lwd=3,lty=2)
 legend("topright",legend=c("youger donor, no IHD","youger donor, IHD","older donor, no IHD","older donor, IHD"),
        col=c("#0571b0","#ca0020","#0571b0","#ca0020"),lwd=2,bty="n",lty=c(1,1,2,2),cex=0.9)
 dev.off()
+
