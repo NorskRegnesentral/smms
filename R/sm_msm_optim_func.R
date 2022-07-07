@@ -1,3 +1,5 @@
+### Multi-state functions part 3 - general smms function, and functions for quantities of interest
+
 library(numDeriv)
 ## NOT DONE
 # start_params = function(data_set, graph){

@@ -122,7 +122,7 @@ type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE)
     }
     
     # Write "possible" functions
-    variable_names_eval_pos <- c("tt","tt-ss","tt-uu-ss") #,"tt-rr-uu-ss","tt-rr-uu-ss-vv")
+    variable_names_eval_pos <- c("tt","tt-ss","tt-ss-uu") #,"tt-rr-uu-ss","tt-rr-uu-ss-vv")
     n_posi <- sum(posi>0)
     S_posi <- rep(NA,n_posi)
     if (n_posi>0){
@@ -212,7 +212,7 @@ type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE)
       if (dim_integral==0){
         eval <- "tt"
       }else{
-        eval <- paste("tt-",variable_names[dim_integral])
+        eval <- paste("tt-",variable_names[dim_integral],sep="")
       }
       
       for (i in 1:max(posi)){
@@ -294,24 +294,24 @@ change_integrand <- function(integr){
   if (grepl("tt2",call)){
     int <- sub("ss,.+tt,","times,tt2=-1,tt,",int)
     if (grepl("uu",call)){
-      int <- sub("\\{.+f_01","\\{\nss<-times[1]\nuu<-times[2]\nf_01",int)
+      int <- sub("\\{.+?f_","\\{\nss<-times[1]\nuu<-times[2]\nf_",int) #sub("\\{.+f_01","\\{\nss<-times[1]\nuu<-times[2]\nf_01",int)
       int <- gsub(", uu",", uu-ss",int)
       int <- gsub("tt - uu - ss","tt- uu",int)
       int <- gsub("tt - ss - uu","tt- uu",int)
       int <- gsub("tt2 - uu - ss","tt2- uu",int)
       int <- gsub("tt2 - ss - uu","tt2- uu",int)
     }else{
-      int <- sub("\\{.+f_01","\\{\nss<-times[1]\nf_01",int)
+      int <- sub("\\{.+?f_","\\{\nss<-times[1]\nf_",int) #sub("\\{.+f_01","\\{\nss<-times[1]\nf_01",int)
     }
   }else{
     int <- sub("ss,.+tt,","times,tt,",int)
     if (grepl("uu",call)){
-      int <- sub("\\{.+f_01","\\{\nss<-times[1]\nuu<-times[2]\nf_01",int)
+      int <- sub("\\{.+?f_","\\{\nss<-times[1]\nuu<-times[2]\nf_",int) #sub("\\{.+f_01","\\{\nss<-times[1]\nuu<-times[2]\nf_01",int)
       int <- gsub(", uu",", uu-ss",int)
       int <- gsub("tt - uu - ss","tt- uu",int)
       int <- gsub("tt - ss - uu","tt- uu",int)
     }else{
-      int <- sub("\\{.+f_01","\\{\nss<-times[1]\nf_01",int)
+      int <- sub("\\{.+?f_","\\{\nss<-times[1]\nf_",int) #sub("\\{.+f_","\\{\nss<-times[1]\nf_01",int)
     }
   }
   return(eval(parse(text=int)))
