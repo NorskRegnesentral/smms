@@ -17,7 +17,7 @@ state_ordering = function(graph){
   id_absorbing = which(!(all_edges[,2] %in% all_edges[,1]))
   absorbing_states = unique(all_edges[id_absorbing,2])
 
-  k = length(as_ids(V(graph))) #number of states
+  k = length(igraph::as_ids(V(graph))) #number of states
 
   state_num = data.frame(state=igraph::as_ids(V(graph)),order=NA,type=NA)
   state_num$order[which(state_num$state %in% initial_states)] <- 0:(length(initial_states)-1)
@@ -152,7 +152,7 @@ construct_formula_types = function(graph){
       form_types = c(form_types, as.character(subsets[p, 1]))
     } else{ ## For all the other possible roads to travel
       for(i in 1:length(paths)){
-        st = sort(state_ord$order[which(state_ord$state%in%as_ids(paths[[i]]))])
+        st = sort(state_ord$order[which(state_ord$state%in%igraph::as_ids(paths[[i]]))])
         data_frame_subset_type_as_char = paste(st, collapse = "")
         form_types = c(form_types, data_frame_subset_type_as_char)
       }
