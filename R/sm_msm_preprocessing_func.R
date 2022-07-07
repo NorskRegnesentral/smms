@@ -10,7 +10,7 @@
 #' The last column indicates whether each state is initial, absorbing or transient.
 state_ordering = function(graph){
   ## Calculating the initial state
-  all_edges = get.edgelist(graph)
+  all_edges = igraph::get.edgelist(graph)
   id_initial = which(!(all_edges[,1] %in% all_edges[,2]))
   initial_states = unique(all_edges[id_initial,1])
 
@@ -19,7 +19,7 @@ state_ordering = function(graph){
 
   k = length(as_ids(V(graph))) #number of states
 
-  state_num = data.frame(state=as_ids(V(graph)),order=NA,type=NA)
+  state_num = data.frame(state=igraph::as_ids(V(graph)),order=NA,type=NA)
   state_num$order[which(state_num$state %in% initial_states)] <- 0:(length(initial_states)-1)
   state_num$type[which(state_num$state %in% initial_states)] <- "init"
 
@@ -79,7 +79,7 @@ relevant_timepoints = function(data, graph){
   init <- state_ord$order[which(state_ord$type=="init")]
   trans <- state_ord$order[which(state_ord$type=="trans")]
   abs <- state_ord$order[which(state_ord$type=="abs")]
-  dists <- distances(graph,mode="in")
+  dists <- igraph::distances(graph,mode="in")
 
   # If the patient does not start in an initial state - add the appropriate initial state at time=0 (if the initial state is not
   # uniquely defined one just has to add one of the initial states)
@@ -145,7 +145,7 @@ construct_formula_types = function(graph){
   ## Determine which subsets containt none, one or multiple paths
   form_types = c()
   for(p in 1:nrow(subsets)){
-    paths = all_simple_paths(graph, state_ord$state[which(state_ord$order==subsets[p,1])],
+    paths = igraph::all_simple_paths(graph, state_ord$state[which(state_ord$order==subsets[p,1])],
                              state_ord$state[which(state_ord$order==subsets[p,2])])
     ## If only observed in initial state
     if(length(paths) == 0){
@@ -179,7 +179,7 @@ construct_obs_types = function(graph){
     st = strsplit(form_types[i],"")[[1]]
     obs_types = c(obs_types,form_types[i])
     if (length(st)>2){
-      ot = sapply(2:(length(st)-1), function(r) combn(st[1:length(st)],r),simplify=F)
+      ot = sapply(2:(length(st)-1), function(r) utils::combn(st[1:length(st)],r),simplify=F)
       ot = lapply(ot,function(m) m[,which(m[1,]==st[1])])
       obs_types = c(obs_types,unlist(lapply(ot,function(m) apply(m,2,paste,collapse=""))))
     }
@@ -276,7 +276,7 @@ arrange_data = function(data, graph){
 #'
 #'
 edge_matrices = function(graph){
-  all_edges = get.edgelist(graph)
+  all_edges = igraph::get.edgelist(graph)
   # Update with state ordering as node names:
   state_ord = state_ordering(graph)
   all_edges[,1] <- state_ord$order[match(all_edges[,1],state_ord$state)]

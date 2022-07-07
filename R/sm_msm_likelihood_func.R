@@ -11,7 +11,7 @@
 #' is an absorbing state, or "trans" for transient if not.
 #' 
 names_of_survival_density = function(graph){
-  all_edges = get.edgelist(graph)
+  all_edges = igraph::get.edgelist(graph)
   # Update with state ordering as node names:
   state_ord = state_ordering(graph)
   all_edges_new=all_edges
@@ -262,7 +262,7 @@ repint2 <- function(ss,innerfunc,tt,param,lower2,upper2,x,tt2=-1,...){ #integrat
   mm <- length(ss)
   out <- rep(NA,mm)
   for (i in 1:mm){
-    out[i] <- integrate(innerfunc,lower=max(lower2-ss[i],0),upper=upper2-ss[i],tt=tt,x=x,
+    out[i] <- stats::integrate(innerfunc,lower=max(lower2-ss[i],0),upper=upper2-ss[i],tt=tt,x=x,
                         ss=ss[i],param=param,tt2=tt2)$value
   }
   return(out)
@@ -270,9 +270,9 @@ repint2 <- function(ss,innerfunc,tt,param,lower2,upper2,x,tt2=-1,...){ #integrat
 # Integral over functions of 1 variable
 repintegrate <- function(innerfunc,tt,param,x,lower,upper,tt2=-1,...){ #integrate over ss
   if (length(lower)==1){
-    out <- integrate(innerfunc,lower=lower,upper=upper,tt=tt,param=param,x=x,tt2=tt2)$value
+    out <- stats::integrate(innerfunc,lower=lower,upper=upper,tt=tt,param=param,x=x,tt2=tt2)$value
   }else{
-    out <- integrate(repint2,innerfunc=innerfunc,lower=max(lower[1],0),upper=upper[1],tt=tt,param=param,x=x,
+    out <- stats::integrate(repint2,innerfunc=innerfunc,lower=max(lower[1],0),upper=upper[1],tt=tt,param=param,x=x,
                      lower2=lower[2],upper2=upper[2],tt2=tt2)$value
   }
   return(out)
@@ -436,7 +436,7 @@ finding_limits <- function(timepoints,form_type,edge_mats,absorbing_states,abs_e
 mloglikelihood <-  function(param,integrand,limits, X = NULL,method1 = "hcubature",mc_cores = 2){
   # Test that limits and integrand have same length
   
-  final_integral = sum(unlist(mclapply(1:length(integrand), function(i){
+  final_integral = sum(unlist(parallel::mclapply(1:length(integrand), function(i){
     mm <- length(limits[[i]])
     lli <- rep(NA,mm)
     for (j in 1:mm){
@@ -456,10 +456,10 @@ mloglikelihood <-  function(param,integrand,limits, X = NULL,method1 = "hcubatur
             },error=function(cond){
               integrand2 <- change_integrand(integrand[[i]][[j]])
               if (length(unique(lower)) != length(lower)){
-                llij = cubintegrate(integrand2, lower = lower,upper = upper, method = "divonne", maxEval = 500,
+                llij = cubature::cubintegrate(integrand2, lower = lower,upper = upper, method = "divonne", maxEval = 500,
                                       tt = tmax[1], tt2=tmax[2],param = param, x = X[i,])$integral
               }else if (length(unique(lower)) == length(lower)){
-                llij = cubintegrate(integrand2, lower = lower,upper = upper,maxEval = 500,
+                llij = cubature::cubintegrate(integrand2, lower = lower,upper = upper,maxEval = 500,
                                       method = method1, tt = tmax[1], tt2=tmax[2],param = param, x = X[i,])$integral
               }
               return(llij)
@@ -467,10 +467,10 @@ mloglikelihood <-  function(param,integrand,limits, X = NULL,method1 = "hcubatur
             
         }else if (length(lower)>2){
           if (length(unique(lower)) != length(lower)){
-            lli[j] = cubintegrate(integrand[[i]][[j]], lower = lower,upper = upper, method = "divonne", maxEval = 500,
+            lli[j] = cubature::cubintegrate(integrand[[i]][[j]], lower = lower,upper = upper, method = "divonne", maxEval = 500,
                                   tt = tmax[1], tt2=tmax[2],param = param, x = X[i,])$integral
           }else if (length(unique(lower)) == length(lower)){
-            lli[j] = cubintegrate(integrand[[i]][[j]], lower = lower,upper = upper,maxEval = 500,
+            lli[j] = cubature::cubintegrate(integrand[[i]][[j]], lower = lower,upper = upper,maxEval = 500,
                                   method = method1, tt = tmax[1], tt2=tmax[2],param = param, x = X[i,])$integral
           }
         }

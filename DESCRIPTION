@@ -19,10 +19,15 @@ Description: Functions for fitting Semi-Markovian multi-state models. Constructs
     initial states and one or more absorbind states. Designed for data where the exact 
     state transitions are not necessarily observed, so that we have interval censoring of 
     the transition times. Data like these are sometimes referred to as panel data.
-License:  use_gpl_license()
+License: use_gpl_license()
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.1
 Imports: 
-    igraph
+    igraph,
+    parallel,
+    cubature,
+    stats,
+    pracma,
+    numDeriv

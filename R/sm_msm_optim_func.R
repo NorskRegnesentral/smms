@@ -15,8 +15,10 @@
 #' for each covariate. The covariate specification is given by the user-specified densities.
 #' @param mc_cores The number of cores to use (for parallelisation). The function uses the mclapply()
 #' function from the parallel package.
+#' @param variance_matrix Whether the variance-covariance matrix for the parameter estimates should be calculated
+#' or not.
 #' @return The result from optimising the log-likelihood: parameter estimates with corresponding variance-covariance
-#' matrix, and the maximum log-likelihood value.
+#' matrix if variance_matrix = TRUE, and the maximum log-likelihood value.
 #' 
 
 # This function needs to be updated so that it takes column names as input: to know which column corresponds
@@ -50,7 +52,7 @@ smms = function(startval, data, graph, X = NULL, mc_cores = 3, variance_matrix =
   }
   
   
-  optimizer <- optim(startval,mloglikelihood,integrand = integrand,limits = all_integral_limits,X=X, method = "L-BFGS",
+  optimizer <- stats::optim(startval,mloglikelihood,integrand = integrand,limits = all_integral_limits,X=X, method = "L-BFGS",
                      mc_cores=mc_cores,hessian = FALSE)
   if(variance_matrix == TRUE){
     hessian_optimizer = numDeriv::hessian(mloglikelihood, optimizer$par, integrand = integrand,limits = all_integral_limits,
@@ -61,10 +63,8 @@ smms = function(startval, data, graph, X = NULL, mc_cores = 3, variance_matrix =
   }
 }
 
-#' Estimates the hessian function confidence intervals
+#' Calculates the variance-covariance matrix.
 #'
-#' Provide estimates and approximate confidence intervals for all parameters 
-#' (on the "original" scale - meaning that all parameters live on -Inf to +Inf).
 #'
 #' @param param  The parameter estimates from optimizer$par in smms.
 #' @param data A data frame where the number of rows correspond to the total number of observations for all patients,
@@ -75,7 +75,7 @@ smms = function(startval, data, graph, X = NULL, mc_cores = 3, variance_matrix =
 #' for each covariate. The covariate specification is given by the user-specified densities.
 #' @param mc_cores The number of cores to use (for parallelisation). The function uses the mclapply()
 #' function from the parallel package.
-#' @return A vector of the same length as time.
+#' @return A matrix with the variance-covariance matrix.
 #' 
 variance_matrix = function(param, data, graph, X = NULL, mc_cores = 3){
   formula_obs_types = all_types(graph)
@@ -120,7 +120,7 @@ variance_matrix = function(param, data, graph, X = NULL, mc_cores = 3){
 #' @return A vector of the same length as time.
 #' 
 est_ci = function(param, hessian,level=0.95,log=TRUE){
-  zz <- qnorm(0.5*(1-level),lower.tail = F)
+  zz <- stats::qnorm(0.5*(1-level),lower.tail = F)
   varCov <- solve(hessian)
   if (log){
     tt <- data.frame(estimate=param,lower.ci=param-zz*sqrt(diag(varCov)),upper.ci=param+zz*sqrt(diag(varCov)))
@@ -189,13 +189,13 @@ occupancy_prob = function(state, time, param, graph, xval = NULL){
                          x = xval)
           },error=function(cond){
             integrand2 <- change_integrand(integrand)
-            llij = cubintegrate(integrand2, lower = lower,upper = upper, method = "divonne", maxEval = 500,
+            llij = cubature::cubintegrate(integrand2, lower = lower,upper = upper, method = "divonne", maxEval = 500,
                                   tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
             return(llij)
           })
           
         }else if (length(lower)>2){
-          opi[j] = cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
+          opi[j] = cubature::cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
                                 tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
         }
       }
@@ -214,7 +214,7 @@ occupancy_prob_ci_band <- function(state,time,param,graph,xval,hessian,level=0.9
   kk <- length(time)
   lci <- rep(NA,kk)
   uci <- rep(NA,kk)
-  zz <- qnorm(0.5*(1-level),lower.tail = F)
+  zz <- stats::qnorm(0.5*(1-level),lower.tail = F)
   for (i in 1:kk){
     sei <- sqrt(delta[i,,drop=F]%*%varCov%*%t(delta[i,,drop=F]))
     lci[i] <- est[i]-zz*sei
@@ -333,7 +333,7 @@ overall_survival = function(time, param, graph, xval = NULL){
           # })
           
         }else if (length(lower)>2){
-          opi[j] = cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
+          opi[j] = cubature::cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
                                 tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
         }
       }
@@ -407,6 +407,6 @@ overall_survival_delta = function(time, param, graph, xval = NULL){
 
 ###
 cubint <- function(integrand,lower,upper,tmax,param,xval){
-  cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
+  cubature::cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
                tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
 }
