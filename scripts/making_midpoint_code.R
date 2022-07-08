@@ -1,5 +1,8 @@
 devtools::load_all()
 library(data.table)
+## This is a work-in-progress script (not been tested) which automatically
+## finds the midpoint.
+## Should only be used to find the startparameters to smms. 
 
 arrange_data_midtpoint = function(data, graph, abs_exact = TRUE){
   set.seed(6789)
