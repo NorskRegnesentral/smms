@@ -112,7 +112,7 @@ for (k in 1:6){
         tts <- c(0,cumsum(c(rweibull(1,exp(param[1]),exp(param[2])))))
       }
       else if(k > 1){
-      tts <- c(0,cumsum(c(rweibull(1,exp(param[1]),exp(param[2])),rexp(k-1,exp(param[3])))))
+        tts <- c(0,cumsum(c(rweibull(1,exp(param[1]),exp(param[2])),rexp(k-1,exp(param[3])))))
       }
       dd[dd$patient==h,"time"] <- c(runif(k,tts[1:k],tts[2:(k+1)]),max(tts)+runif(1,0.001,0.2))
       dd[dd$patient==h,"state"] <- 1:(k+1)
@@ -215,4 +215,3 @@ for (k in 1:6){
   ctimes[which(ctimes$int_dim==(k-1) & ctimes$num_par=="2"),3] <- mean(tt)
 }
 
-save(ctimes,file="~/H/Paperskriving/Masteroppgave_gamma_prosesser/Simulations/comp_times_exp1.RData")
