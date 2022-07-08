@@ -52,8 +52,8 @@ arrange_data_midtpoint = function(data, graph, abs_exact = TRUE){
       timepoints_mid_length = time_points[-excluded_timepoint]
       colnames(timepoints_mid_length) = c(init, trans, abs)
     }
-    if(length(type != 1)){
-      ## Draw if we have more than one possuble type
+    if(length(type) != 1){
+      ## Draw if we have more than one possible type
       type_sample = sample(1:length(type), 1)
       type_new = type[type_sample]
       type = type_new
@@ -61,16 +61,16 @@ arrange_data_midtpoint = function(data, graph, abs_exact = TRUE){
     if(type %in% init){
       ## Only in transient state
         timepoints_midpoint[i, 1] = time_points[1]
-      } else if(observation_type[i] == type){
+    } else if(observation_type[i] == type){
         ## Exclude all NA and the double timepoints
         na_omit_intergal_limits = time_points[!is.na(time_points)]
         timepoints_mid_length = na_omit_intergal_limits[-excluded_timepoint]
         for(j in 1:(length(timepoints_mid_length)-1)){
           ## If stays in a state or is observed in absorbing exact
           if(j == (length(timepoints_mid_length)-1) & j != 1 & (abs_exact == TRUE | !(abs %in% unlist(strsplit(observation_type[i], ""))))){
-            timepoints_midpoint[i, j] = timepoints_mid_length[j+1] - timepoints_midpoint[i, j-1]
+            timepoints_midpoint[i, j] = timepoints_mid_length[j+1] - sum(timepoints_midpoint[i, 1:j-1])
           } else if (j == (length(timepoints_mid_length)-1) & j == 1 & abs_exact == TRUE){ ## If observed exact in absorbing (direct)
-            timepoints_midpoint[i, j] = timepoints_mid_length[j+1]
+            timepoints_midpoint[i, j] = timepoints_mid_length[j+1] - timepoints_mid_length[j]
           } else if((j == 1 & j != (length(timepoints_mid_length)-1)) | (j == (length(timepoints_mid_length)-1) & j == 1 & abs_exact == FALSE)){ ## First midpoint 
             timepoints_midpoint[i, j] = (timepoints_mid_length[j] + timepoints_mid_length[j+1])/2   
           }else if((j != 1 & j != (length(timepoints_mid_length)-1)) | (j == (length(timepoints_mid_length)-1) & j != 1 & abs_exact == FALSE)){ ## Second midpoint
@@ -106,9 +106,9 @@ arrange_data_midtpoint = function(data, graph, abs_exact = TRUE){
         for(j in 1:(length(timepoints_mid_length)-1)){
           ## If stays in a state or is observed in absorbing exact
           if(j == (length(timepoints_mid_length)-1) & j != 1 & (abs_exact == TRUE | !(abs %in% unlist(strsplit(observation_type[i], ""))))){
-            timepoints_midpoint[i, j] = timepoints_mid_length[j+1] - timepoints_midpoint[i, j-1]
+            timepoints_midpoint[i, j] = timepoints_mid_length[j+1] - sum(timepoints_midpoint[i, 1:j-1])
           } else if (j == (length(timepoints_mid_length)-1) & j == 1 & abs_exact == TRUE){ ## If observed exact in absorbing (direct)
-            timepoints_midpoint[i, j] = timepoints_mid_length[j+1]
+            timepoints_midpoint[i, j] = timepoints_mid_length[j+1] - timepoints_mid_length[j]
           } else if((j == 1 & j != (length(timepoints_mid_length)-1)) | (j == (length(timepoints_mid_length)-1) & j == 1 & abs_exact == FALSE)){ ## First midpoint 
             timepoints_midpoint[i, j] = (timepoints_mid_length[j] + timepoints_mid_length[j+1])/2   
           }else if((j != 1 & j != (length(timepoints_mid_length)-1)) | (j == (length(timepoints_mid_length)-1) & j != 1 & abs_exact == FALSE)){ ## Second midpoint
@@ -119,6 +119,8 @@ arrange_data_midtpoint = function(data, graph, abs_exact = TRUE){
     }  
   return(timepoints_midpoint)
 }
+
+
 
 type_to_integrand_midpoint = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE){
   travi <- edge_mats$traveled[form_type,,drop=F]
@@ -233,9 +235,10 @@ optim_midpoint = function(startval, data, graph, X = NULL){
   limit2[[i]] = as.vector(unlist(limit1[which(!is.na(limit1))]))
   integrand[[i]] = eval(parse(text=type_to_integrand_midpoint(f_types, edge_mats, names_surv_dens)))
   }
-  t = nlminb(startval, loglikelihood_midpoint, integrand = integrand, limits = limit2, X = X)
-  startval = t$par
-  return(startval)
+  t = nlminb(startval, loglikelihood_midpoint, integrand = integrand, limits = limit2, X = X, 
+             lower=rep(-50,length(startval)),upper=rep(50,length(startval)))
+  startval_final = t$par
+  return(startval_final)
 }
 
 
