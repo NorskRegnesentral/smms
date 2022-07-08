@@ -52,8 +52,11 @@ smms = function(startval, data, graph, X = NULL, mc_cores = 3, variance_matrix =
   }
   
   
-  optimizer <- stats::optim(startval,mloglikelihood,integrand = integrand,limits = all_integral_limits,X=X, method = "L-BFGS",
-                     mc_cores=mc_cores,hessian = FALSE)
+  # optimizer <- stats::optim(startval,mloglikelihood,integrand = integrand,limits = all_integral_limits,X=X, method = "L-BFGS",
+  #                    mc_cores=mc_cores,hessian = FALSE)
+  
+  optimizer <- stats::nlminb(startval,mloglikelihood,integrand = integrand,limits = all_integral_limits,X=X, 
+                            mc_cores=mc_cores,hessian = FALSE, lower=rep(-50,length(params)),upper=rep(50,length(params)))
   if(variance_matrix == TRUE){
     hessian_optimizer = numDeriv::hessian(mloglikelihood, optimizer$par, integrand = integrand,limits = all_integral_limits,
                                           mc_cores=mc_cores,X=X)
