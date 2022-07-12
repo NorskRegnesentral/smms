@@ -1,6 +1,13 @@
 ### Multi-state functions part 4 - Writing out likelihood as latex code
 
-# form_type,edge_mats,names_surv_dens,absorbing_states
+#' Write likelihood contribution for one observation type to latex type format
+#'
+#' @param obs_type The observation type (as a string).
+#' @param graph A directed, acyclic graph in the igraph format (igraph package).
+#' @param abs_exact  A boolean indicating whether the time of entrance into absorbing states is observed
+#' exactly (TRUE) or not (FALSE). Default value is TRUE.
+#' @return A text string with the likelihood contribution formula written in a latex type format.
+#' 
 write_type <- function(obs_type,graph,abs_exact=TRUE){
   
   formula_obs_types = all_types(graph)
@@ -167,6 +174,14 @@ write_type <- function(obs_type,graph,abs_exact=TRUE){
   return(lik)
 }
 
+#' Write log-likelihood for a graph in latex format.
+#'
+#' @param graph A directed, acyclic graph in the igraph format (igraph package).
+#' @param abs_exact  A boolean indicating whether the time of entrance into absorbing states is observed
+#' exactly (TRUE) or not (FALSE). Default value is TRUE.
+#' @return Writes a txt file into the working directory within which one will find the entire log-likelihood
+#' formula belonging to the graph, in latex format.
+#' 
 write_loglikelihood <- function(graph,abs_exact=TRUE){
   o_types <- construct_obs_types(graph)
   all_parts <- rep(NA,length(o_types))

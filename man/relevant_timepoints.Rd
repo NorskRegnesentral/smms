@@ -4,7 +4,7 @@
 \alias{relevant_timepoints}
 \title{Filter away redundant observations in a multi-state dataset}
 \usage{
-relevant_timepoints(formula, subject, data, graph)
+relevant_timepoints(data, graph)
 }
 \arguments{
 \item{data}{A data frame with 3 columns: patient (numbering or names for each patient), time (the time when a patient was observed),
