@@ -1,10 +1,10 @@
 ---
-title: "Semi-Markov Multi-State models for interval censored data: worked examples"
+title: "smms: analysing CAV data with simple exponential model"
 subtitle: "The smms package, version 0.0.0"
 author: "C. Cunen"
 date: "`r format(Sys.time(), '%d/%m/%Y')`"
 output: 
-  html_document:
+  pdf_document:
     number_sections: true
 editor_options: 
   chunk_output_type: console
@@ -13,11 +13,6 @@ editor_options:
 ```{r setup, include=FALSE}
 rm(list = ls())
 devtools::load_all() 
-library(igraph)
-library(parallel)
-library(cubature)
-library(msm)
-
 ```
 
 # Introduction: the CAV dataset
@@ -27,6 +22,7 @@ Describe dataset, show graph.
 Specifying the graph: 
 
 ```{r }
+library(msm)
 gg = graph_from_literal("well"--+"mild"--+"severe"--+"death", "well"--+"death", "mild"--+"death")
 plot(gg,layout=layout_with_sugiyama(gg,layers=c(1,1,1,2))$layout,vertex.size=40)
 ```

@@ -6,16 +6,20 @@
 \usage{
 mloglikelihood(
   param,
-  integrand,
+  integrands,
   limits,
   X = NULL,
-  method1 = "hcubature",
+  cmethod = "hcubature",
   mc_cores = 2
 )
 }
 \arguments{
 \item{param}{The parameter values in which the log-likelihood should be evaluated. The dimension
 and ordering is given by the user-specified densities.}
+
+\item{integrands}{A nested list with the integrand(s) for a set of patients. The length of the
+outer list corresponds to the number of patients, the lengths of the inner lists correspond to the
+the number of different paths the patient may have travelled.}
 
 \item{limits}{A nested list with the limits of integration for a set of patients. The length of the
 outer list corresponds to the number of patients, the lengths of the inner lists correspond to the
@@ -24,15 +28,11 @@ the number of different paths the patient may have travelled.}
 \item{X}{A matrix with the covariates. Number of rows equal to the number of patients and one column
 for each covariate. The covariate specification is given by the user-specified densities.}
 
-\item{mc_cores}{The number of cores to use (for parallelisation). The function uses the mclapply()
-function from the parallel package.}
-
-\item{integrands}{A nested list with the integrand(s) for a set of patients. The length of the
-outer list corresponds to the number of patients, the lengths of the inner lists correspond to the
-the number of different paths the patient may have travelled.}
-
 \item{cmethod}{The integration method of choice for the cubintegrate() function. Only for integrals
 of higher dimension than 2. Defaults to "hcubature".}
+
+\item{mc_cores}{The number of cores to use (for parallelisation). The function uses the mclapply()
+function from the parallel package.}
 }
 \value{
 The value of the negative log-likelihood corresponding to the dataset and parameters provided.

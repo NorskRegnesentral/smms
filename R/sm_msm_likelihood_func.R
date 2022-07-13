@@ -249,15 +249,22 @@ type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE)
 
 
 
-#' Integrate functions of dimension 1 and 2
+#' Integrate functions of dimension 2
 #'
-#' The following two functions are helper functions for integrating in dimension 1 or 2.
+#' The following two functions are helper functions for integrating the inner function
+#' in an integral of dimension 2.
 #'
-#' @param innerfunc The integrand (an R function), with inputs tt, ss, and uu (if dimension=2).
+#' @param ss The variable to integrate over in the outer integral.
+#' @param innerfunc The integrand (an R function).
+#' @param tt An input to innerfunc (a time-point in which to evaluate the integrand).
+#' @param param The parameter value in which to evaluate the integrand.
+#' @param x A vector of covariate values.
+#' @param lower2  Lower limits.
+#' @param upper2 Upper limits.
+#' @param tt2 An input to innerfunc (a time-point in which to evaluate the integrand).
+#' @param ... further arguments to innerfunc.
 #' @return The value of the integral.
 #'
-#'
-# Integrals over functions of 2 variables
 repint2 <- function(ss,innerfunc,tt,param,lower2,upper2,x,tt2=-1,...){ #integrate over uu
   mm <- length(ss)
   out <- rep(NA,mm)
@@ -267,7 +274,21 @@ repint2 <- function(ss,innerfunc,tt,param,lower2,upper2,x,tt2=-1,...){ #integrat
   }
   return(out)
 } 
-# Integral over functions of 1 variable
+
+#' Integrate functions of dimension 1 
+#'
+#' The following is a helper function for integrating in dimension 1.
+#'
+#' @param innerfunc The integrand (an R function).
+#' @param tt An input to innerfunc (a time-point in which to evaluate the integrand).
+#' @param param The parameter value in which to evaluate the integrand.
+#' @param x A vector of covariate values.
+#' @param lower  Lower limits.
+#' @param upper Upper limits.
+#' @param tt2 An input to innerfunc (a time-point in which to evaluate the integrand).
+#' @param ... further arguments to innerfunc.
+#' @return The value of the integral.
+#'
 repintegrate <- function(innerfunc,tt,param,x,lower,upper,tt2=-1,...){ #integrate over ss
   if (length(lower)==1){
     out <- stats::integrate(innerfunc,lower=lower,upper=upper,tt=tt,param=param,x=x,tt2=tt2)$value
@@ -283,7 +304,7 @@ repintegrate <- function(innerfunc,tt,param,x,lower,upper,tt2=-1,...){ #integrat
 #' Change integrand syntax from the form appropriate for repintegrate() to the form appropriate 
 #' for cubintegrate().
 #'
-#' @param integrand An R function from eval-parse and type_to_integrand().
+#' @param integr An R function from eval-parse and type_to_integrand().
 #' @return An R function
 #' 
 change_integrand <- function(integr){
@@ -433,10 +454,10 @@ finding_limits <- function(timepoints,form_type,edge_mats,absorbing_states,abs_e
 #' function from the parallel package.
 #' @return The value of the negative log-likelihood corresponding to the dataset and parameters provided.
 #' 
-mloglikelihood <-  function(param,integrand,limits, X = NULL,method1 = "hcubature",mc_cores = 2){
+mloglikelihood <-  function(param,integrands,limits, X = NULL,cmethod = "hcubature",mc_cores = 2){
   # Test that limits and integrand have same length
   
-  final_integral = sum(unlist(parallel::mclapply(1:length(integrand), function(i){
+  final_integral = sum(unlist(parallel::mclapply(1:length(integrands), function(i){
     mm <- length(limits[[i]])
     lli <- rep(NA,mm)
     for (j in 1:mm){
@@ -446,32 +467,32 @@ mloglikelihood <-  function(param,integrand,limits, X = NULL,method1 = "hcubatur
       
       
       if(length(lower) == 0){
-        lli[j] = integrand[[i]][[j]](times=1,tt = tmax[1], tt2=tmax[2],param = param, x = X[i,]) # the value of times does not matter
+        lli[j] = integrands[[i]][[j]](times=1,tt = tmax[1], tt2=tmax[2],param = param, x = X[i,]) # the value of times does not matter
       }else if(length(lower)>0){
         if(length(lower)<=2 ){
           # If integrate fails, use cubintegrate:
             lli[j] = tryCatch({
-              repintegrate(integrand[[i]][[j]],tt=tmax[1],tt2=tmax[2],lower=lower,upper = upper, param = param, 
+              repintegrate(integrands[[i]][[j]],tt=tmax[1],tt2=tmax[2],lower=lower,upper = upper, param = param, 
                                     x = X[i,])
             },error=function(cond){
-              integrand2 <- change_integrand(integrand[[i]][[j]])
+              integrand2 <- change_integrand(integrands[[i]][[j]])
               if (length(unique(lower)) != length(lower)){
                 llij = cubature::cubintegrate(integrand2, lower = lower,upper = upper, method = "divonne", maxEval = 500,
                                       tt = tmax[1], tt2=tmax[2],param = param, x = X[i,])$integral
               }else if (length(unique(lower)) == length(lower)){
                 llij = cubature::cubintegrate(integrand2, lower = lower,upper = upper,maxEval = 500,
-                                      method = method1, tt = tmax[1], tt2=tmax[2],param = param, x = X[i,])$integral
+                                      method = cmethod, tt = tmax[1], tt2=tmax[2],param = param, x = X[i,])$integral
               }
               return(llij)
             })
             
         }else if (length(lower)>2){
           if (length(unique(lower)) != length(lower)){
-            lli[j] = cubature::cubintegrate(integrand[[i]][[j]], lower = lower,upper = upper, method = "divonne", maxEval = 500,
+            lli[j] = cubature::cubintegrate(integrands[[i]][[j]], lower = lower,upper = upper, method = "divonne", maxEval = 500,
                                   tt = tmax[1], tt2=tmax[2],param = param, x = X[i,])$integral
           }else if (length(unique(lower)) == length(lower)){
-            lli[j] = cubature::cubintegrate(integrand[[i]][[j]], lower = lower,upper = upper,maxEval = 500,
-                                  method = method1, tt = tmax[1], tt2=tmax[2],param = param, x = X[i,])$integral
+            lli[j] = cubature::cubintegrate(integrands[[i]][[j]], lower = lower,upper = upper,maxEval = 500,
+                                  method = cmethod, tt = tmax[1], tt2=tmax[2],param = param, x = X[i,])$integral
           }
         }
       }

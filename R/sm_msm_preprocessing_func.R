@@ -17,9 +17,9 @@ state_ordering = function(graph){
   id_absorbing = which(!(all_edges[,2] %in% all_edges[,1]))
   absorbing_states = unique(all_edges[id_absorbing,2])
 
-  k = length(igraph::as_ids(V(graph))) #number of states
+  k = length(igraph::as_ids(igraph::V(graph))) #number of states
 
-  state_num = data.frame(state=igraph::as_ids(V(graph)),order=NA,type=NA)
+  state_num = data.frame(state=igraph::as_ids(igraph::V(graph)),order=NA,type=NA)
   state_num$order[which(state_num$state %in% initial_states)] <- 0:(length(initial_states)-1)
   state_num$type[which(state_num$state %in% initial_states)] <- "init"
 

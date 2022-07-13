@@ -1,4 +1,6 @@
 ### Multi-state functions part 3 - general smms function, and functions for quantities of interest
+
+
 #' Fit a semi-Markovian multistate model
 #'
 #' The function the user should interact with. Assumes that the user has provided densities and 
@@ -15,16 +17,14 @@
 #' for each covariate. The covariate specification is given by the user-specified densities.
 #' @param mc_cores The number of cores to use (for parallelisation). The function uses the mclapply()
 #' function from the parallel package.
-#' @param variance_matrix Whether the variance-covariance matrix for the parameter estimates should be calculated
-#' or not.
+#' @param hessian_matrix Whether the hessian matrix (observed Fisher information matrix) for the parameter estimates 
+#' should be calculated or not.
+#' @param cmethod The integration method of choice for the cubintegrate() function. Only for integrals 
+#' of higher dimension than 2. Defaults to "hcubature".
 #' @return The result from optimising the log-likelihood: parameter estimates with corresponding variance-covariance
 #' matrix if variance_matrix = TRUE, and the maximum log-likelihood value.
 #' 
-
-# This function needs to be updated so that it takes column names as input: to know which column corresponds
-# to "patient" (numbering or names for each patient), "time" (the time when a patient was observed),
-# "state" (the state which the patient occupies at the observation time).
-smms = function(startval, data, graph, X = NULL, mc_cores = 3, variance_matrix = FALSE){
+smms = function(startval, data, graph, X = NULL, mc_cores = 3, hessian_matrix = FALSE,cmethod = "hcubature"){
   formula_obs_types = all_types(graph)
   edge_mats = edge_matrices(graph)
   state_ord = state_ordering(graph)
@@ -55,10 +55,11 @@ smms = function(startval, data, graph, X = NULL, mc_cores = 3, variance_matrix =
   # optimizer <- stats::optim(startval,mloglikelihood,integrand = integrand,limits = all_integral_limits,X=X, method = "L-BFGS",
   #                    mc_cores=mc_cores,hessian = FALSE)
   
-  optimizer <- stats::nlminb(startval,mloglikelihood,integrand = integrand,limits = all_integral_limits,X=X, 
-                            mc_cores=mc_cores,hessian = FALSE, lower=rep(-50,length(params)),upper=rep(50,length(params)))
-  if(variance_matrix == TRUE){
-    hessian_optimizer = numDeriv::hessian(mloglikelihood, optimizer$par, integrand = integrand,limits = all_integral_limits,
+  optimizer <- stats::nlminb(startval,mloglikelihood,integrand = integrand,limits = all_integral_limits,X=X, cmethod=cmethod,
+                            mc_cores=mc_cores,hessian = FALSE, lower=rep(-50,length(startval)),upper=rep(50,length(startval)))
+  
+  if(hessian_matrix == TRUE){
+    hessian_optimizer = numDeriv::hessian(mloglikelihood, optimizer$par, integrand = integrand,limits = all_integral_limits, cmethod=cmethod,
                                           mc_cores=mc_cores,X=X)
     return(list(optimizer, hessian_optimizer))
   } else{
@@ -208,7 +209,20 @@ occupancy_prob = function(state, time, param, graph, xval = NULL){
   return(op)
 }
 
-#' Compute uncertainty bands
+
+#' Compute the occupancy probability over time with uncertainty bands
+#'
+#' The last state is often heavy to compute, but recall that is has to be equal to 1 minus the others
+#'
+#' @param state A string with a number indicating the state for which to compute the probability (in the ordered naming system). 
+#' @param time A vector of timepoints for which to compute the occupancy probability.
+#' @param param  The parameter values in which the probabilities should be evaluated. The dimension
+#' and ordering is given by the user-specified densities.
+#' @param graph A directed, acyclic graph giving the multistate structure, in the igraph format (igraph package).
+#' @param xval A vector of covariate values.
+#' @param hessian The hessian matrix from the optimisation of the negative log-likelihood.
+#' @param level The confidence level for the uncertainty bands, defaults to 0.95.
+#' @return A vector of the same length as time.
 #' 
 occupancy_prob_ci_band <- function(state,time,param,graph,xval,hessian,level=0.95){
   est <- occupancy_prob(state=state,time=time,param=param,graph=graph,xval=xval)
@@ -226,6 +240,18 @@ occupancy_prob_ci_band <- function(state,time,param,graph,xval,hessian,level=0.9
   return(list(est=est,lower=lci,upper=uci))
 }
 
+#' Calculating partial derivatives of occupancy probability functions wrt parameters
+#'
+#' Helper function for computing uncertainty bands.
+#'
+#' @param state A string with a number indicating the state for which to compute the probability (in the ordered naming system). 
+#' @param time A vector of timepoints for which to compute the occupancy probability.
+#' @param param  The parameter values in which the probabilities should be evaluated. The dimension
+#' and ordering is given by the user-specified densities.
+#' @param graph A directed, acyclic graph giving the multistate structure, in the igraph format (igraph package).
+#' @param xval A vector of covariate values.
+#' @return A vector of the same length as time.
+#' 
 occupancy_prob_delta = function(state, time, param, graph, xval = NULL){
   edge_mats = edge_matrices(graph)
   names_surv_dens = names_of_survival_density(graph)
@@ -283,7 +309,7 @@ occupancy_prob_delta = function(state, time, param, graph, xval = NULL){
 }
 
 
-#' Compute the overall survival
+#' Compute the overall survival 
 #'
 #' ...
 #'
@@ -346,7 +372,18 @@ overall_survival = function(time, param, graph, xval = NULL){
   return(op)
 }
 
-#' Compute uncertainty bands
+#' Compute the overall survival with uncertainty bands
+#'
+#' ...
+#'
+#' @param time A vector of timepoints for which to compute the occupancy probability.
+#' @param param  The parameter values in which the probabilities should be evaluated. The dimension
+#' and ordering is given by the user-specified densities.
+#' @param graph A directed, acyclic graph giving the multistate structure, in the igraph format (igraph package).
+#' @param xval A vector of covariate values.
+#' @param hessian The hessian matrix from the optimisation of the negative log-likelihood.
+#' @param level The confidence level for the uncertainty bands, defaults to 0.95.
+#' @return A vector of the same length as time.
 #' 
 overall_survival_ci_band <- function(time,param,graph,xval,hessian,level=0.95){
   est <- overall_survival(time=time,param=param,graph=graph,xval=xval)
@@ -355,7 +392,7 @@ overall_survival_ci_band <- function(time,param,graph,xval,hessian,level=0.95){
   kk <- length(time)
   lci <- rep(NA,kk)
   uci <- rep(NA,kk)
-  zz <- qnorm(0.5*(1-level),lower.tail = F)
+  zz <- stats::qnorm(0.5*(1-level),lower.tail = F)
   for (i in 1:kk){
     sei <- sqrt(delta[i,,drop=F]%*%varCov%*%t(delta[i,,drop=F]))
     lci[i] <- est[i]-zz*sei
@@ -364,6 +401,17 @@ overall_survival_ci_band <- function(time,param,graph,xval,hessian,level=0.95){
   return(list(est=est,lower=lci,upper=uci))
 }
 
+#' Calculating partial derivatives of overall survival function wrt parameters
+#'
+#' Helper function for computing uncertainty bands.
+#'
+#' @param time A vector of timepoints for which to compute the occupancy probability.
+#' @param param  The parameter values in which the probabilities should be evaluated. The dimension
+#' and ordering is given by the user-specified densities.
+#' @param graph A directed, acyclic graph giving the multistate structure, in the igraph format (igraph package).
+#' @param xval A vector of covariate values.
+#' @return A vector of the same length as time.
+#' 
 overall_survival_delta = function(time, param, graph, xval = NULL){
   edge_mats = edge_matrices(graph)
   names_surv_dens = names_of_survival_density(graph)
@@ -396,10 +444,7 @@ overall_survival_delta = function(time, param, graph, xval = NULL){
           opi[j,] = pracma::grad(repintegrate,x0=param,innerfunc=integrand,tt = tmax[1], tt2=tmax[2],lower=lower,upper = upper,x = xval)
           
         }else if (length(lower)>2){
-          #opi[j,] = pracma::grad(cubintegrate,x0=param,f=integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
-          #                      tt = tmax[1], tt2=tmax[2], x = xval)
-          #needs to put cubintegrate in a separate function
-          print("not ready yet")
+          opi[j,] = pracma::grad(cubint,x0=param,integrand=integrand,lower = lower,upper = upper, tmax=tmax,xval=xval)
         }
       }
     }
@@ -408,7 +453,16 @@ overall_survival_delta = function(time, param, graph, xval = NULL){
   return(op)
 }
 
-###
+#' Helper function for differentiating cubintegrate functions
+#'
+#' @param integrand The function to integrate.
+#' @param lower  Lower limits.
+#' @param upper Upper limits.
+#' @param tmax Time-points in which to evaluate the integrand.
+#' @param param The parameter value in which to evaluate the integrand.
+#' @param xval A vector of covariate values.
+#' @return The value after integration.
+#' 
 cubint <- function(integrand,lower,upper,tmax,param,xval){
   cubature::cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
                tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral

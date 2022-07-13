@@ -7,7 +7,7 @@
 change_integrand(integr)
 }
 \arguments{
-\item{integrand}{An R function from eval-parse and type_to_integrand().}
+\item{integr}{An R function from eval-parse and type_to_integrand().}
 }
 \value{
 An R function

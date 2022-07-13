@@ -4,7 +4,15 @@
 \alias{smms}
 \title{Fit a semi-Markovian multistate model}
 \usage{
-smms(startval, data, graph, X = NULL, mc_cores = 3, variance_matrix = FALSE)
+smms(
+  startval,
+  data,
+  graph,
+  X = NULL,
+  mc_cores = 3,
+  hessian_matrix = FALSE,
+  cmethod = "hcubature"
+)
 }
 \arguments{
 \item{startval}{The parameter values where the optimisation routine will start. The dimension
@@ -22,8 +30,11 @@ for each covariate. The covariate specification is given by the user-specified d
 \item{mc_cores}{The number of cores to use (for parallelisation). The function uses the mclapply()
 function from the parallel package.}
 
-\item{variance_matrix}{Whether the variance-covariance matrix for the parameter estimates should be calculated
-or not.}
+\item{hessian_matrix}{Whether the hessian matrix (observed Fisher information matrix) for the parameter estimates
+should be calculated or not.}
+
+\item{cmethod}{The integration method of choice for the cubintegrate() function. Only for integrals
+of higher dimension than 2. Defaults to "hcubature".}
 }
 \value{
 The result from optimising the log-likelihood: parameter estimates with corresponding variance-covariance
