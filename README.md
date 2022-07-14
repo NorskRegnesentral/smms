@@ -118,8 +118,9 @@ par(mar=c(1,1,1,1))
 plot(gg,layout=layout_with_sugiyama(gg,layers=c(1,1,1,2))$layout,vertex.size=40)
 ```
 
-![](README_files/figure-markdown_github/unnamed-chunk-3-1.png) ##\#
-Specifying parametric models
+![](README_files/figure-markdown_github/unnamed-chunk-3-1.png)
+
+### Specifying parametric models
 
 Then, the user has to specify parametric models for all transition times
 (meaning one for each edge in the graph). In the current version of the
@@ -193,6 +194,55 @@ print(names_of_survival_density(gg))
 
 Here we see for example that the density for the edge between “mild” and
 “severe” should be named `f_12`(as we do above).
+
+### Fitting the model
+
+Now we have everything in place in order to fit the multi-state model we
+have specified above:
+
+``` r
+startval <- c(-2.5,-1.1,-1.2,-3.1,-2.8)
+
+mlo <- smms(startval,dd,gg, mc_cores = 1, hessian_matrix = T)
+```
+
+One needs some start values for the optimisation, and we will soon add a
+function which calculates good starting values for a given model.
+Increasing the number of cores will make optimisation faster (but will
+not work on Windows machines). Here we choose to compute the hessian
+matrix too, which takes a bit more time. With one core this might take
+something like 5 minutes to compute on an ordinary laptop.
+
+We can compute AIC, and look at the estimated parameters and approximate
+95% confidence intervals.
+
+``` r
+# Compute AIC (higher values are better with this definition)
+aic <- (-2*mlo$opt$objective)-2*length(mlo$opt$par) #-2887.1
+
+# Look at estimates and 95% confidence intervals. 
+# On the -Inf to Inf scale:
+print(round(est_ci(mlo$opt$par,mlo$hess),2)) 
+```
+
+    ##   estimate lower.ci upper.ci
+    ## 1    -2.51    -2.66    -2.36
+    ## 2    -1.11    -1.36    -0.86
+    ## 3    -1.24    -1.48    -1.00
+    ## 4    -3.11    -3.33    -2.90
+    ## 5    -2.76    -3.67    -1.84
+
+``` r
+# On the 0 to Inf scale (on the transition intensity scale):
+round(exp(est_ci(mlo$opt$par,mlo$hess)),2) 
+```
+
+    ##   estimate lower.ci upper.ci
+    ## 1     0.08     0.07     0.09
+    ## 2     0.33     0.26     0.42
+    ## 3     0.29     0.23     0.37
+    ## 4     0.04     0.04     0.06
+    ## 5     0.06     0.03     0.16
 
 ## References
 

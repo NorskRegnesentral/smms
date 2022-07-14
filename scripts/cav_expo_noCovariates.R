@@ -39,11 +39,12 @@ f_13 = function(param, x, t){dexp(t,exp(param[5]))}
 # Fitting the model 
 startval <- c(-2.5,-1.1,-1.2,-3.1,-2.8)
 
-mlo <- smms(startval,dd,gg, mc_cores = 1)
-ho <- hessian_matrix(mlo$par,dd,gg,mc_cores=1) #calculates hessian (can be done inside smms() too)
+mlo <- smms(startval,dd,gg, mc_cores = 1,hessian_matrix = T)
+#save(mlo,file="cav_expo_noCov_optims")
+ho <- hessian_matrix(mlo$opt$par,dd,gg,mc_cores=1) #calculates hessian (can be done inside smms() too)
 
 # Compute AIC (higher values are better with this definition)
-aic <- (-2*mlo$objective)-2*length(startval) #-2887.1
+aic <- (-2*mlo$opt$objective)-2*length(startval) #-2887.1
 
 # Look at estimates and 95% confidence intervals
 round(est_ci(mlo$par,ho),2) #parameters living on the real line
