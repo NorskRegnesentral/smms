@@ -109,7 +109,7 @@ to stick to the same naming/numbering when specifying the model graph.
 # Specify the graph:
 gg = graph_from_literal("well"--+"mild"--+"severe"--+"death", "well"--+"death", "mild"--+"death")
 par(mar=c(2,2,2,2))
-plot(gg,layout=layout_with_sugiyama(gg,layers=c(1,1,1,2))$layout)
+plot(gg,layout=layout_with_sugiyama(gg,layers=c(1,1,1,2))$layout,vertex.size=40)
 ```
 
 ![](README_files/figure-markdown_github/unnamed-chunk-3-1.png)

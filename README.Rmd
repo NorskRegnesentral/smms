@@ -76,7 +76,7 @@ Next we specify the model graph. Here we assume a four-state illness death model
 # Specify the graph:
 gg = graph_from_literal("well"--+"mild"--+"severe"--+"death", "well"--+"death", "mild"--+"death")
 par(mar=c(2,2,2,2))
-plot(gg,layout=layout_with_sugiyama(gg,layers=c(1,1,1,2))$layout)
+plot(gg,layout=layout_with_sugiyama(gg,layers=c(1,1,1,2))$layout,vertex.size=40)
 ```
 
 
