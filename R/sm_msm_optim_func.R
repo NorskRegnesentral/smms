@@ -26,6 +26,7 @@
 #' @return The result from optimising the log-likelihood: parameter estimates with corresponding variance-covariance
 #' matrix if variance_matrix = TRUE, and the maximum log-likelihood value.
 #' 
+#' @export
 smms = function(startval, data, graph, X = NULL, abs_exact=TRUE, mc_cores = 1, hessian_matrix = FALSE,cmethod = "hcubature"){
   formula_obs_types = all_types(graph)
   edge_mats = edge_matrices(graph)
@@ -84,7 +85,7 @@ smms = function(startval, data, graph, X = NULL, abs_exact=TRUE, mc_cores = 1, h
 #' @param cmethod The integration method of choice for the cubintegrate() function. Only for integrals 
 #' of higher dimension than 2. Defaults to "hcubature".
 #' @return A matrix with the hessian matrix.
-#' 
+#' @export
 hessian_matrix = function(param, data, graph, X = NULL, mc_cores = 1,cmethod = "hcubature"){
   formula_obs_types = all_types(graph)
   edge_mats = edge_matrices(graph)
@@ -126,7 +127,7 @@ hessian_matrix = function(param, data, graph, X = NULL, mc_cores = 1,cmethod = "
 #' @param level The level of confidence. Default value is 0.95.
 #' @param pos Boolean denoting whether the estimates and intervals should live on the real line (default), or on the postive half-line (pos=TRUE).
 #' @return A table with one row per estimate, and 3 columns (estimate, lower.ci, upper.ci).
-#' 
+#' @export
 est_ci = function(param, hessian,level=0.95,pos=FALSE){
   zz <- stats::qnorm(0.5*(1-level),lower.tail = F)
   varCov <- solve(hessian)
@@ -154,7 +155,7 @@ est_ci = function(param, hessian,level=0.95,pos=FALSE){
 #' @param graph A directed, acyclic graph giving the multistate structure, in the igraph format (igraph package).
 #' @param xval A vector of covariate values.
 #' @return A vector of the same length as time.
-#' 
+#' @export
 occupancy_prob = function(state, time, param, graph, xval = NULL){
   edge_mats = edge_matrices(graph)
   names_surv_dens = names_of_survival_density(graph)
@@ -228,7 +229,7 @@ occupancy_prob = function(state, time, param, graph, xval = NULL){
 #' @param hessian The hessian matrix from the optimisation of the negative log-likelihood.
 #' @param level The confidence level for the uncertainty bands, defaults to 0.95.
 #' @return A vector of the same length as time.
-#' 
+#' @export
 occupancy_prob_ci_band <- function(state,time,param,graph,xval,hessian,level=0.95){
   est <- occupancy_prob(state=state,time=time,param=param,graph=graph,xval=xval)
   delta <- occupancy_prob_delta(state=state,time=time,param=param,graph=graph,xval=xval)
@@ -325,7 +326,7 @@ occupancy_prob_delta = function(state, time, param, graph, xval = NULL){
 #' @param graph A directed, acyclic graph giving the multistate structure, in the igraph format (igraph package).
 #' @param xval A vector of covariate values.
 #' @return A vector of the same length as time.
-#' 
+#' @export
 overall_survival = function(time, param, graph, xval = NULL){
   edge_mats = edge_matrices(graph)
   names_surv_dens = names_of_survival_density(graph)
@@ -390,7 +391,7 @@ overall_survival = function(time, param, graph, xval = NULL){
 #' @param hessian The hessian matrix from the optimisation of the negative log-likelihood.
 #' @param level The confidence level for the uncertainty bands, defaults to 0.95.
 #' @return A vector of the same length as time.
-#' 
+#' @export
 overall_survival_ci_band <- function(time,param,graph,xval,hessian,level=0.95){
   est <- overall_survival(time=time,param=param,graph=graph,xval=xval)
   delta <- overall_survival_delta(time=time,param=param,graph=graph,xval=xval)
@@ -474,7 +475,7 @@ overall_survival_delta = function(time, param, graph, xval = NULL){
 #' @param graph A directed, acyclic graph giving the multistate structure, in the igraph format (igraph package).
 #' @param xval A vector of covariate values.
 #' @return A vector of the same length as time_t.
-#' 
+#' @export
 transition_prob = function(trans_ji, time_t,time_v, param, graph, xval = NULL){
   edge_mats = edge_matrices(graph)
   names_surv_dens = names_of_survival_density(graph)
@@ -567,7 +568,7 @@ transition_prob = function(trans_ji, time_t,time_v, param, graph, xval = NULL){
 #' @param hessian The hessian matrix from the optimisation of the negative log-likelihood.
 #' @param level The confidence level for the uncertainty bands, defaults to 0.95.
 #' @return A vector of the same length as time.
-#' 
+#' @export
 transition_prob_ci_band <- function(trans_ji, time_t,time_v, param,graph,xval,hessian,level=0.95){
   est <- transition_prob(trans_ji=trans_ji,time_t=time_t,time_v=time_v,param=param,graph=graph,xval=xval)
   delta <- transition_prob_delta(trans_ji=trans_ji,time_t=time_t,time_v=time_v,param=param,graph=graph,xval=xval)

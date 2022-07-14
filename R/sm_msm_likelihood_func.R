@@ -9,7 +9,7 @@
 #' density functions. The two next columns give the names of the source node and the target node *in the
 #' original user-defined names*. The last column gives the type of edge: either "abs" for absorbing if the target node
 #' is an absorbing state, or "trans" for transient if not.
-#' 
+#' @export
 names_of_survival_density = function(graph){
   all_edges = igraph::get.edgelist(graph)
   # Update with state ordering as node names:
@@ -45,7 +45,7 @@ names_of_survival_density = function(graph){
 #' @param abs_exact A boolean indicating whether the time of entrance into absorbing states is observed
 #' exactly (TRUE) or not (FALSE). Default value is TRUE.
 #' @return A text string giving the R syntax of the integrand.
-#'
+#' @export
 type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE){
   
   travi <- edge_mats$traveled[form_type,,drop=F]
@@ -354,7 +354,7 @@ change_integrand <- function(integr){
 #' @return A list with "lower" a vector of the lower limits of integration, "upper" a vector of the 
 #' upper limits of integration, and "tmax" the last timepoint (in which the integrand often needs 
 #' to be evaluated).
-#' 
+#' @export
 finding_limits <- function(timepoints,form_type,edge_mats,absorbing_states,abs_exact=TRUE){
   splitted_f_type = unlist(strsplit(form_type, ""))
   
@@ -453,7 +453,7 @@ finding_limits <- function(timepoints,form_type,edge_mats,absorbing_states,abs_e
 #' @param mc_cores The number of cores to use (for parallelisation). The function uses the mclapply()
 #' function from the parallel package.
 #' @return The value of the negative log-likelihood corresponding to the dataset and parameters provided.
-#' 
+#' @export
 mloglikelihood <-  function(param,integrands,limits, X = NULL,cmethod = "hcubature",mc_cores = 2){
   # Test that limits and integrand have same length
   

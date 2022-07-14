@@ -181,7 +181,7 @@ write_type <- function(obs_type,graph,abs_exact=TRUE){
 #' exactly (TRUE) or not (FALSE). Default value is TRUE.
 #' @return Writes a txt file into the working directory within which one will find the entire log-likelihood
 #' formula belonging to the graph, in latex format.
-#' 
+#' @export
 write_loglikelihood <- function(graph,abs_exact=TRUE){
   o_types <- construct_obs_types(graph)
   all_parts <- rep(NA,length(o_types))
