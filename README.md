@@ -51,6 +51,8 @@ in a simple example.
 
 ## A simple example
 
+### Data
+
 We will use the CAV dataset from the `msm` package (Jackson 2011) as an
 illustration. The dataset monitors a number of patients for a number of
 years after heart transplantation. Coronary allograft vasculopathy (CAV)
@@ -63,7 +65,9 @@ Here we see the observations belonging to two patients. Note here that
 the states were originally numbered from 1 to 4, but for the sake of
 this illustration I have changed the state names to “well”, “mild”,
 “severe” and “death”. This is to demonstrate that the package accepts
-names as both numbers and strings.
+names as both numbers and strings. After deleting some observations that
+are deemed incorrect (because they appear to get better, see next
+paragraph), we end up with 2398 observations in 556 different patients.
 
 ``` r
 library(smms)
@@ -100,21 +104,97 @@ print(dd[1:11,])
     ## 10  100003 2.008219   17   IHD severe
     ## 11  100003 2.991781   17   IHD  death
 
-Next we specify the model graph. Here we assume a four-state illness
-death model, since we consider CAV to be irreversible (so we do not
-allow for patients to move back to less severe states). It is convenient
-to stick to the same naming/numbering when specifying the model graph.
+### Specifying the model graph
+
+Here we assume a four-state illness death model, since we consider CAV
+to be irreversible (so we do not allow for patients to move back to less
+severe states). It is convenient to stick to the same state names as in
+the dataset when specifying the model graph.
 
 ``` r
 # Specify the graph:
 gg = graph_from_literal("well"--+"mild"--+"severe"--+"death", "well"--+"death", "mild"--+"death")
-par(mar=c(2,2,2,2))
+par(mar=c(1,1,1,1))
 plot(gg,layout=layout_with_sugiyama(gg,layers=c(1,1,1,2))$layout,vertex.size=40)
 ```
 
-![](README_files/figure-markdown_github/unnamed-chunk-3-1.png)
+![](README_files/figure-markdown_github/unnamed-chunk-3-1.png) ##\#
+Specifying parametric models
 
-# References
+Then, the user has to specify parametric models for all transition times
+(meaning one for each edge in the graph). In the current version of the
+package, these models have to be specified by providing density
+functions (in a specific format detailed below), as well as the
+corresponding survival functions. The functions will look like the
+following if one chooses to use simple exponential models for all
+transitions (i.e. meaning that we are fitting a homogeneous Markov model
+which could have been fitted with the `msm`package too - but this is for
+the sake of a simple illustration):
+
+``` r
+f_01 = function(param, x, tt){dexp(tt,exp(param[1]))}
+f_12 = function(param, x, tt){dexp(tt,exp(param[2]))}
+f_23 = function(param, x, tt){dexp(tt,exp(param[3]))}
+f_03 = function(param, x, tt){dexp(tt,exp(param[4]))}
+f_13 = function(param, x, tt){dexp(tt,exp(param[5]))}
+
+S_01 = function(param, x, tt){1-pexp(tt,exp(param[1]))}
+S_12 = function(param, x, tt){1-pexp(tt,exp(param[2]))}
+S_23 = function(param, x, tt){1-pexp(tt,exp(param[3]))}
+S_03 = function(param, x, tt){1-pexp(tt,exp(param[4]))}
+S_13 = function(param, x, tt){1-pexp(tt,exp(param[5]))}
+```
+
+Important to note:
+
+-   **the names of the functions**: these have to be in the form `f_ij`
+    and `S_ij` with i indicating the source state (in the internal
+    numbering system) and j indicating the receiving state. More details
+    on the naming convention below.
+-   **the arguments of the functions**: these should always be given as
+    `(param, x, tt)` as above. `x` will point to the vector of measured
+    covariates (for a patient) when these are present. When there are no
+    covariates, like in this example, `x` should still be present as an
+    argument, but will not be called within the functions. In the
+    vignettes we include examples with covariates.
+-   **the scale of the parameters**: for the sake of stable optimisation
+    it is convinient that the parameters live on the real line (instead
+    of the positive half-line as in the common parameterisation of the
+    exponential distribution). Therefore, we include an exponential
+    transformation of the `param` vector, and we recommend that
+    transformation for all positive parameters.
+-   **the ordering of the parameters**: `param`denotes the full
+    parameter vector for the model.
+-   Survival functions should be written so that they return 1 when `tt`
+    is negative. Using build-in R CDFs for distributions over the
+    positive half-line will ensure this. Otherwise, if the user codes
+    the survival functions herself, she should ensure that they return 1
+    when `tt`is negative. We include an example with user-specified
+    distribution functions in the vignettes.
+
+As we saw above, the user has to follow a strict naming convention when
+specifying the densities and survival functions: within the package, the
+states are numbered from 0 to k-1 (k being the number of states), in a
+specific order which depends on the graph. To find out how the user
+defined state names relate to the internal numbering system, use the
+`names_of_survival_density` function. This allways recommended before
+specifying the model:
+
+``` r
+print(names_of_survival_density(gg))
+```
+
+    ##   edge_name survival_name density_name from_prev to_prev  type
+    ## 1        01          S_01         f_01      well    mild trans
+    ## 2        03          S_03         f_03      well   death   abs
+    ## 3        12          S_12         f_12      mild  severe trans
+    ## 4        13          S_13         f_13      mild   death   abs
+    ## 5        23          S_23         f_23    severe   death   abs
+
+Here we see for example that the density for the edge between “mild” and
+“severe” should be named `f_12`(as we do above).
+
+## References
 
 -   Jackson CH (2011). [Multi-State Models for Panel Data: The msm
     Package for R.](https://www.jstatsoft.org/v38/i08/) Journal of
