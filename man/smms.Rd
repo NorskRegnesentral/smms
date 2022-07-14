@@ -9,7 +9,8 @@ smms(
   data,
   graph,
   X = NULL,
-  mc_cores = 3,
+  abs_exact = TRUE,
+  mc_cores = 1,
   hessian_matrix = FALSE,
   cmethod = "hcubature"
 )
@@ -27,8 +28,11 @@ state (the state which the patient occupies at the observation time). FOR NOW!!}
 \item{X}{A matrix with the covariates. Number of rows equal to the number of patients and one column
 for each covariate. The covariate specification is given by the user-specified densities.}
 
+\item{abs_exact}{A boolean indicating whether the time of entrance into absorbing states is observed
+exactly (TRUE) or not (FALSE). Default value is TRUE.}
+
 \item{mc_cores}{The number of cores to use (for parallelisation). The function uses the mclapply()
-function from the parallel package.}
+function from the parallel package. Defaults to 1.}
 
 \item{hessian_matrix}{Whether the hessian matrix (observed Fisher information matrix) for the parameter estimates
 should be calculated or not.}

@@ -7,7 +7,7 @@
 occupancy_prob(state, time, param, graph, xval = NULL)
 }
 \arguments{
-\item{state}{A string with a number indicating the state for which to compute the probability (in the ordered naming system).}
+\item{state}{A string with the name of a state for which to compute the probability (user-defined names).}
 
 \item{time}{A vector of timepoints for which to compute the occupancy probability.}
 

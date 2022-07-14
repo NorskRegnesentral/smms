@@ -15,16 +15,18 @@
 #' @param graph A directed, acyclic graph giving the multistate structure, in the igraph format (igraph package).
 #' @param X A matrix with the covariates. Number of rows equal to the number of patients and one column
 #' for each covariate. The covariate specification is given by the user-specified densities.
+#' @param abs_exact A boolean indicating whether the time of entrance into absorbing states is observed
+#' exactly (TRUE) or not (FALSE). Default value is TRUE.
 #' @param mc_cores The number of cores to use (for parallelisation). The function uses the mclapply()
-#' function from the parallel package.
+#' function from the parallel package. Defaults to 1.
 #' @param hessian_matrix Whether the hessian matrix (observed Fisher information matrix) for the parameter estimates 
-#' should be calculated or not.
+#' should be calculated or not. 
 #' @param cmethod The integration method of choice for the cubintegrate() function. Only for integrals 
 #' of higher dimension than 2. Defaults to "hcubature".
 #' @return The result from optimising the log-likelihood: parameter estimates with corresponding variance-covariance
 #' matrix if variance_matrix = TRUE, and the maximum log-likelihood value.
 #' 
-smms = function(startval, data, graph, X = NULL, mc_cores = 3, hessian_matrix = FALSE,cmethod = "hcubature"){
+smms = function(startval, data, graph, X = NULL, abs_exact=TRUE, mc_cores = 1, hessian_matrix = FALSE,cmethod = "hcubature"){
   formula_obs_types = all_types(graph)
   edge_mats = edge_matrices(graph)
   state_ord = state_ordering(graph)
@@ -44,8 +46,8 @@ smms = function(startval, data, graph, X = NULL, mc_cores = 3, hessian_matrix = 
     integrand_mellomregn = list()
     integral_mellomregn= list()
     for(j in 1:length(f_types)){
-      integrand_mellomregn[[j]] = eval(parse(text=type_to_integrand(f_types[j], edge_mats, names_surv_dens)))
-      integral_mellomregn[[j]] = finding_limits(timepointMat[i,],f_types[j],edge_mats,absorbing_states)
+      integrand_mellomregn[[j]] = eval(parse(text=type_to_integrand(f_types[j], edge_mats, names_surv_dens,abs_exact=abs_exact)))
+      integral_mellomregn[[j]] = finding_limits(timepointMat[i,],f_types[j],edge_mats,absorbing_states,abs_exact=abs_exact)
     }
     all_integral_limits[[i]] = integral_mellomregn
     integrand[[i]] = integrand_mellomregn
@@ -67,7 +69,7 @@ smms = function(startval, data, graph, X = NULL, mc_cores = 3, hessian_matrix = 
   }
 }
 
-#' Calculates the variance-covariance matrix.
+#' Calculates the hessian matrix (observed Fisher information matrix).
 #'
 #'
 #' @param param  The parameter estimates from optimizer$par in smms.
@@ -78,10 +80,12 @@ smms = function(startval, data, graph, X = NULL, mc_cores = 3, hessian_matrix = 
 #' @param X A matrix with the covariates. Number of rows equal to the number of patients and one column
 #' for each covariate. The covariate specification is given by the user-specified densities.
 #' @param mc_cores The number of cores to use (for parallelisation). The function uses the mclapply()
-#' function from the parallel package.
-#' @return A matrix with the variance-covariance matrix.
+#' function from the parallel package. Defaults to 1.
+#' @param cmethod The integration method of choice for the cubintegrate() function. Only for integrals 
+#' of higher dimension than 2. Defaults to "hcubature".
+#' @return A matrix with the hessian matrix.
 #' 
-variance_matrix = function(param, data, graph, X = NULL, mc_cores = 3){
+hessian_matrix = function(param, data, graph, X = NULL, mc_cores = 1,cmethod = "hcubature"){
   formula_obs_types = all_types(graph)
   edge_mats = edge_matrices(graph)
   state_ord = state_ordering(graph)
@@ -108,7 +112,7 @@ variance_matrix = function(param, data, graph, X = NULL, mc_cores = 3){
     integrand[[i]] = integrand_mellomregn
   }
   hessian_optimizer = numDeriv::hessian(mloglikelihood, param, integrand = integrand,limits = all_integral_limits,
-                                        mc_cores=mc_cores,X=X)
+                                        mc_cores=mc_cores,X=X,cmethod=cmethod)
   return(hessian_optimizer)
 }
 
@@ -120,13 +124,13 @@ variance_matrix = function(param, data, graph, X = NULL, mc_cores = 3){
 #' @param param  The parameter estimates.
 #' @param hessian The hessian matrix.
 #' @param level The level of confidence. Default value is 0.95.
-#' @param log Boolean denoting whether the intervals should be on the log scale (default), or on the exp/hazard scale.
-#' @return A vector of the same length as time.
+#' @param pos Boolean denoting whether the estimates and intervals should live on the real line (default), or on the postive half-line (pos=TRUE).
+#' @return A table with one row per estimate, and 3 columns (estimate, lower.ci, upper.ci).
 #' 
-est_ci = function(param, hessian,level=0.95,log=TRUE){
+est_ci = function(param, hessian,level=0.95,pos=FALSE){
   zz <- stats::qnorm(0.5*(1-level),lower.tail = F)
   varCov <- solve(hessian)
-  if (log){
+  if (pos==FALSE){
     tt <- data.frame(estimate=param,lower.ci=param-zz*sqrt(diag(varCov)),upper.ci=param+zz*sqrt(diag(varCov)))
   }else{
     ses <- sqrt(diag(varCov))*exp(param)
@@ -143,7 +147,7 @@ est_ci = function(param, hessian,level=0.95,log=TRUE){
 #'
 #' The last state is often heavy to compute, but recall that is has to be equal to 1 minus the others
 #'
-#' @param state A string with a number indicating the state for which to compute the probability (in the ordered naming system). 
+#' @param state A string with the name of a state for which to compute the probability (user-defined names). 
 #' @param time A vector of timepoints for which to compute the occupancy probability.
 #' @param param  The parameter values in which the probabilities should be evaluated. The dimension
 #' and ordering is given by the user-specified densities.
@@ -156,6 +160,7 @@ occupancy_prob = function(state, time, param, graph, xval = NULL){
   names_surv_dens = names_of_survival_density(graph)
   
   state_ord = state_ordering(graph)
+  state <- state_ord$ord[state_ord$state==state] #find state numbering
   absorbing_states <- sort(state_ord$order[which(state_ord$type=="abs")])
   
   f_types = construct_formula_types(graph)
@@ -214,7 +219,7 @@ occupancy_prob = function(state, time, param, graph, xval = NULL){
 #'
 #' The last state is often heavy to compute, but recall that is has to be equal to 1 minus the others
 #'
-#' @param state A string with a number indicating the state for which to compute the probability (in the ordered naming system). 
+#' @param state A string with the name of a state for which to compute the probability (user-defined names). 
 #' @param time A vector of timepoints for which to compute the occupancy probability.
 #' @param param  The parameter values in which the probabilities should be evaluated. The dimension
 #' and ordering is given by the user-specified densities.
@@ -244,7 +249,7 @@ occupancy_prob_ci_band <- function(state,time,param,graph,xval,hessian,level=0.9
 #'
 #' Helper function for computing uncertainty bands.
 #'
-#' @param state A string with a number indicating the state for which to compute the probability (in the ordered naming system). 
+#' @param state A string with the name of a state for which to compute the probability (user-defined names). 
 #' @param time A vector of timepoints for which to compute the occupancy probability.
 #' @param param  The parameter values in which the probabilities should be evaluated. The dimension
 #' and ordering is given by the user-specified densities.
@@ -257,6 +262,7 @@ occupancy_prob_delta = function(state, time, param, graph, xval = NULL){
   names_surv_dens = names_of_survival_density(graph)
   
   state_ord = state_ordering(graph)
+  state <- state_ord$ord[state_ord$state==state] #find state numbering
   absorbing_states <- sort(state_ord$order[which(state_ord$type=="abs")])
   
   f_types = construct_formula_types(graph)
@@ -452,6 +458,225 @@ overall_survival_delta = function(time, param, graph, xval = NULL){
   }
   return(op)
 }
+
+#' Compute the transition probability over time
+#'
+#' The probability that a patient is found in state i at a time-point t given that she was in state j at 
+#' a prior time-point v. Returns a vector of zeros if the transition from j to i is not possible (given the graph).
+#' 
+#' Only computes probabilities for direct transitions (a specific edge in the graph)
+#'
+#' @param trans_ji A string with two state names separated by "-" indicating the prior state j and the current state i (using user-defined state names). 
+#' @param time_t A vector of timepoints denoting the "current" time.
+#' @param time_v A number indicating the single prior time-point (must be smaller than all time_t).
+#' @param param  The parameter values in which the probabilities should be evaluated. The dimension
+#' and ordering is given by the user-specified densities.
+#' @param graph A directed, acyclic graph giving the multistate structure, in the igraph format (igraph package).
+#' @param xval A vector of covariate values.
+#' @return A vector of the same length as time_t.
+#' 
+transition_prob = function(trans_ji, time_t,time_v, param, graph, xval = NULL){
+  edge_mats = edge_matrices(graph)
+  names_surv_dens = names_of_survival_density(graph)
+  
+  state_ord = state_ordering(graph)
+  absorbing_states <- sort(state_ord$order[which(state_ord$type=="abs")])
+  
+  f_types = construct_formula_types(graph)
+  state_j_name <- unlist(strsplit(trans_ji,"-"))[1]
+  state_i_name <- unlist(strsplit(trans_ji,"-"))[2]
+  state_j <- state_ord$order[state_ord$state==state_j_name]
+  state_i <- state_ord$order[state_ord$state==state_i_name]
+  
+  f_types_match = f_types[which(substr(f_types,nchar(f_types)-1,nchar(f_types)) == paste(state_j,state_i,sep="") )]
+  
+  # Make a time-point format:
+  dd <- data.frame(patient=c(rep(1,2)),time=c("v","t"),state=c(state_j_name,state_i_name))
+  timepoints <- arrange_data(dd,graph)
+  timepoints <- timepoints[1:(dim(timepoints)[2]-1)]
+  #
+  mm <- length(f_types_match) #0 or 1
+  
+  kk <- length(time_t)
+  op <- rep(0,kk)
+  if (mm==0){
+    return(op)
+  }else{
+    # Denominator:
+    dn <- occupancy_prob(state_j_name,time_v,param,graph,xval)
+    
+    # Numerator:
+    f_type = f_types_match
+    integrand = eval(parse(text=type_to_integrand(f_type,edge_mats, names_surv_dens,abs_exact=FALSE))) # always with abs_exact=FALSE
+    
+    choice <- (length(which(edge_mats$passedBy[f_type,]==max(edge_mats$traveled[f_type,])))>0)  #TRUE: if absorbing state is reached from a state where there was an option to go a different way
+    
+    if (substr(f_type,nchar(f_type),nchar(f_type)) %in% absorbing_states & choice==FALSE){ #if patient is observed in absorbing state
+      dim_int <- nchar(f_type)-2  
+    }else{ #if patient has not reached absorbing state, or has reached it from a node with a choice
+      dim_int <- nchar(f_type)-1 
+    }
+    
+    for (j in 1:kk){
+      timepointsj <- timepoints
+      timepointsj[which(timepointsj=="v")] <- time_v
+      timepointsj[which(timepointsj=="t")] <- time_t[j]
+      tt <- as.numeric(timepointsj)
+      names(tt) <- names(timepointsj)
+      
+      lims <- finding_limits(tt,f_type,edge_mats,absorbing_states,abs_exact=F)
+      lower <- lims$lower
+      upper <- lims$upper
+      tmax <- lims$tmax
+      
+      if(length(lower) == 0){
+        op[j] = integrand(times=1,tt = tmax[1], tt2=tmax[2],param = param, x = xval) # the value of times does not matter
+      }else if(length(lower)>0){
+        if(length(lower)<=2 ){
+          #opi[j] = repintegrate(integrand,tt = tmax[1], tt2=tmax[2],lower=lower,upper = upper, param = param, x = xval)
+          
+          op[j] = tryCatch({
+            repintegrate(integrand,tt=tmax[1],tt2=tmax[2],lower=lower,upper = upper, param = param,
+                         x = xval)
+          },error=function(cond){
+            integrand2 <- change_integrand(integrand)
+            llij = cubature::cubintegrate(integrand2, lower = lower,upper = upper, method = "divonne", maxEval = 500,
+                                          tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
+            return(llij)
+          })
+          
+        }else if (length(lower)>2){
+          op[j] = cubature::cubintegrate(integrand, lower = lower,upper = upper, method = "divonne", maxEval = 500,
+                                          tt = tmax[1], tt2=tmax[2],param = param, x = xval)$integral
+        }
+      }
+    }
+    return(op/dn)
+  }
+}
+#' Compute the transition probability over time with uncertainty bands
+#'
+#'
+#' @param trans_ji A string with two state names separated by "-" indicating the prior state j and the current state i (using user-defined state names). 
+#' @param time_t A vector of timepoints denoting the "current" time.
+#' @param time_v A number indicating the single prior time-point (must be smaller than all time_t).
+#' @param param  The parameter values in which the probabilities should be evaluated. The dimension
+#' and ordering is given by the user-specified densities.
+#' @param graph A directed, acyclic graph giving the multistate structure, in the igraph format (igraph package).
+#' @param xval A vector of covariate values.
+#' @param hessian The hessian matrix from the optimisation of the negative log-likelihood.
+#' @param level The confidence level for the uncertainty bands, defaults to 0.95.
+#' @return A vector of the same length as time.
+#' 
+transition_prob_ci_band <- function(trans_ji, time_t,time_v, param,graph,xval,hessian,level=0.95){
+  est <- transition_prob(trans_ji=trans_ji,time_t=time_t,time_v=time_v,param=param,graph=graph,xval=xval)
+  delta <- transition_prob_delta(trans_ji=trans_ji,time_t=time_t,time_v=time_v,param=param,graph=graph,xval=xval)
+  varCov <- solve(hessian)
+  kk <- length(time_t)
+  lci <- rep(NA,kk)
+  uci <- rep(NA,kk)
+  zz <- stats::qnorm(0.5*(1-level),lower.tail = F)
+  for (i in 1:kk){
+    sei <- sqrt(delta[i,,drop=F]%*%varCov%*%t(delta[i,,drop=F]))
+    lci[i] <- est[i]-zz*sei
+    uci[i] <- est[i]+zz*sei
+  }
+  return(list(est=est,lower=lci,upper=uci))
+}
+
+#' Calculating partial derivatives of transition probability functions wrt parameters
+#'
+#' Helper function for computing uncertainty bands.
+#'
+#' @param trans_ji A string with two state names separated by "-" indicating the prior state j and the current state i (using user-defined state names). 
+#' @param time_t A vector of timepoints denoting the "current" time.
+#' @param time_v A number indicating the single prior time-point (must be smaller than all time_t).
+#' @param param  The parameter values in which the probabilities should be evaluated. The dimension
+#' and ordering is given by the user-specified densities.
+#' @param graph A directed, acyclic graph giving the multistate structure, in the igraph format (igraph package).
+#' @param xval A vector of covariate values.
+#' @return A vector of the same length as time.
+#' 
+transition_prob_delta = function(trans_ji, time_t,time_v, param, graph, xval = NULL){
+  edge_mats = edge_matrices(graph)
+  names_surv_dens = names_of_survival_density(graph)
+  
+  state_ord = state_ordering(graph)
+  absorbing_states <- sort(state_ord$order[which(state_ord$type=="abs")])
+  
+  f_types = construct_formula_types(graph)
+  state_j_name <- unlist(strsplit(trans_ji,"-"))[1]
+  state_i_name <- unlist(strsplit(trans_ji,"-"))[2]
+  state_j <- state_ord$order[state_ord$state==state_j_name]
+  state_i <- state_ord$order[state_ord$state==state_i_name]
+  
+  f_types_match = f_types[which(substr(f_types,nchar(f_types)-1,nchar(f_types)) == paste(state_j,state_i,sep="") )]
+  
+  # Make a time-point format:
+  dd <- data.frame(patient=c(rep(1,2)),time=c("v","t"),state=c(state_j_name,state_i_name))
+  timepoints <- arrange_data(dd,graph)
+  timepoints <- timepoints[1:(dim(timepoints)[2]-1)]
+  #
+  mm <- length(f_types_match) #0 or 1
+  
+  kk <- length(time_t)
+  n_deriv <- matrix(0,kk,length(param))
+  if (mm==0){
+    return(n_deriv)
+  }else{
+    # Denominator:
+    dn <- occupancy_prob(state_j_name,time_v,param,graph,xval)
+    dn_deriv <- occupancy_prob_delta(state_j_name,time_v,param,graph,xval)
+    
+    # Numerator:
+    f_type = f_types_match
+    integrand = eval(parse(text=type_to_integrand(f_type,edge_mats, names_surv_dens,abs_exact=FALSE))) # always with abs_exact=FALSE
+    
+    choice <- (length(which(edge_mats$passedBy[f_type,]==max(edge_mats$traveled[f_type,])))>0)  #TRUE: if absorbing state is reached from a state where there was an option to go a different way
+    
+    if (substr(f_type,nchar(f_type),nchar(f_type)) %in% absorbing_states & choice==FALSE){ #if patient is observed in absorbing state
+      dim_int <- nchar(f_type)-2  
+    }else{ #if patient has not reached absorbing state, or has reached it from a node with a choice
+      dim_int <- nchar(f_type)-1 
+    }
+    
+    for (j in 1:kk){
+      timepointsj <- timepoints
+      timepointsj[which(timepointsj=="v")] <- time_v
+      timepointsj[which(timepointsj=="t")] <- time_t[j]
+      tt <- as.numeric(timepointsj)
+      names(tt) <- names(timepointsj)
+      
+      lims <- finding_limits(tt,f_type,edge_mats,absorbing_states,abs_exact=F)
+      lower <- lims$lower
+      upper <- lims$upper
+      tmax <- lims$tmax
+      
+      if(length(lower) == 0){
+        n_deriv[j,] = pracma::grad(integrand,x0=param,times=1,tt = tmax[1], tt2=tmax[2], x=xval)
+      }else if(length(lower)>0){
+        if(length(lower)<=2 ){
+          #opi[j] = repintegrate(integrand,tt = tmax[1], tt2=tmax[2],lower=lower,upper = upper, param = param, x = xval)
+          
+          n_deriv[j,] = tryCatch({
+            pracma::grad(repintegrate,x0=param,innerfunc=integrand,tt=tmax[1],tt2=tmax[2],lower=lower,upper = upper,x = xval)
+          },error=function(cond){
+            integrand2 <- change_integrand(integrand)
+            llij = pracma::grad(cubint,x0=param,integrand=integrand2,lower = lower,upper = upper, tmax=tmax,xval=xval)
+            return(llij)
+          })
+          
+        }else if (length(lower)>2){
+          n_deriv[j,] = pracma::grad(cubint,x0=param,integrand=integrand2,lower = lower,upper = upper, tmax=tmax,xval=xval)
+        }
+      }
+    }
+    nn <- transition_prob(trans_ji=trans_ji,time_t=time_t,time_v=time_v,param=param,graph=graph,xval=xval)*dn
+    deriv <- (n_deriv*dn-nn%*%dn_deriv)/dn^2
+    return(deriv)
+  }
+}
+
 
 #' Helper function for differentiating cubintegrate functions
 #'

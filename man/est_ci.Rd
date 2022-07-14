@@ -4,7 +4,7 @@
 \alias{est_ci}
 \title{Estimates and confidence intervals}
 \usage{
-est_ci(param, hessian, level = 0.95, log = TRUE)
+est_ci(param, hessian, level = 0.95, pos = FALSE)
 }
 \arguments{
 \item{param}{The parameter estimates.}
@@ -13,10 +13,10 @@ est_ci(param, hessian, level = 0.95, log = TRUE)
 
 \item{level}{The level of confidence. Default value is 0.95.}
 
-\item{log}{Boolean denoting whether the intervals should be on the log scale (default), or on the exp/hazard scale.}
+\item{pos}{Boolean denoting whether the estimates and intervals should live on the real line (default), or on the postive half-line (pos=TRUE).}
 }
 \value{
-A vector of the same length as time.
+A table with one row per estimate, and 3 columns (estimate, lower.ci, upper.ci).
 }
 \description{
 Provide estimates and approximate confidence intervals for all parameters
