@@ -29,3 +29,7 @@ Imports:
     stats,
     pracma,
     numDeriv
+Suggests: 
+    rmarkdown,
+    knitr
+VignetteBuilder: knitr

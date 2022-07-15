@@ -105,11 +105,11 @@ Important to note:
 
 * **the names of the functions**: these have to be in the form `f_ij` and `S_ij` with i indicating the source state (in the internal numbering system) and j indicating the receiving state. More details on the naming convention below.
 * **the arguments of the functions**: these should always be given as `(param, x, tt)` as above. `x` will point to the vector of measured covariates (for a patient) when these are present. When there are no covariates, like in this example, `x` should still be present as an argument, but will not be called within the functions. In the vignettes we include examples with covariates.
-* **the scale of the parameters**: for the sake of stable optimisation it is convinient that the parameters live on the real line (instead of the positive half-line as in the common parameterisation of the exponential distribution). Therefore, we include an exponential transformation of the `param` vector, and we recommend that transformation for all positive parameters.
+* **the scale of the parameters**: for the sake of stable optimisation it is convenient that the parameters live on the real line (instead of the positive half-line as in the common parameterisation of the exponential distribution). Therefore, we include an exponential transformation of the `param` vector, and we recommend that transformation for all positive parameters.
 * **the ordering of the parameters**: `param`denotes the full parameter vector for the model.
 * Survival functions should be written so that they return 1 when `tt` is negative. Using build-in R CDFs for distributions over the positive half-line will ensure this. Otherwise, if the user codes the survival functions herself, she should ensure that they return 1 when `tt`is negative. We include an example with user-specified distribution functions in the vignettes.
 
-As we saw above, the user has to follow a strict naming convention when specifying the densities and survival functions: within the package, the states are numbered from 0 to k-1 (k being the number of states), in a specific order which depends on the graph. To find out how the user defined state names relate to the internal numbering system, use the `names_of_survival_density` function.  This allways recommended before specifying the model:
+As we saw above, the user has to follow a strict naming convention when specifying the densities and survival functions: within the package, the states are numbered from 0 to k-1 (k being the number of states), in a specific order which depends on the graph. To find out how the user defined state names relate to the internal numbering system, use the `names_of_survival_density` function.  This always recommended before specifying the model:
 
 ```{r}
 print(names_of_survival_density(gg))
@@ -126,7 +126,7 @@ startval <- c(-2.5,-1.1,-1.2,-3.1,-2.8)
 mlo <- smms(startval,dd,gg, mc_cores = 1, hessian_matrix = T)
 ```
 
-One needs some start values for the optimisation, and we will soon add a function which calculates good starting values for a given model. Increasing the number of cores will make optimisation faster (but will not work on Windows machines). Here we choose to compute the hessian matrix too, which takes a bit more time. With one core this might take something like 5 minutes to compute on an ordinary laptop.
+One needs some start values for the optimisation, and we will soon add a function which calculates good starting values for a given model. Increasing the number of cores will make optimisation faster (but will not work on Windows machines). Here we choose to compute the hessian matrix too, which takes a bit more time. With one core this might take some minutes to compute on an ordinary laptop.
 
 ```{r,echo=F}
 load("README_files/cav_expo_noCov_optims")

@@ -1,12 +1,10 @@
 #### CAV dataset
 ### Expo model (i.e. time-homogeneous Markov) without covariates 
-setwd("~/Multistate models/smms")
-rm(list = ls())
-devtools::load_all() 
+library(smms)
 
 
 ## Preprocessing
-gg = igraph::graph_from_literal("well"--+"mild"--+"severe"--+"death", "well"--+"death", "mild"--+"death")
+gg = igraph::graph_from_literal("1"--+"2"--+"3"--+"4", "1"--+"4", "2"--+"4")
 
 # Testing for CAV-data
 library(msm)
@@ -39,24 +37,24 @@ f_13 = function(param, x, t){dexp(t,exp(param[5]))}
 # Fitting the model 
 startval <- c(-2.5,-1.1,-1.2,-3.1,-2.8)
 
-mlo <- smms(startval,dd,gg, mc_cores = 1,hessian_matrix = T)
-#save(mlo,file="cav_expo_noCov_optims")
+mlo <- smms(startval,dd,gg, mc_cores = 1,hessian_matrix = F)
+#save(mlo,file="vignettes/cav_expo_noCov_optims")
 ho <- hessian_matrix(mlo$opt$par,dd,gg,mc_cores=1) #calculates hessian (can be done inside smms() too)
 
 # Compute AIC (higher values are better with this definition)
 aic <- (-2*mlo$opt$objective)-2*length(startval) #-2887.1
 
 # Look at estimates and 95% confidence intervals
-round(est_ci(mlo$par,ho),2) #parameters living on the real line
+round(est_ci(mlo$opt$par,ho),2) #parameters living on the real line
 
-round(exp(est_ci(mlo$par,ho)),2) #parameters living on the positive halv-line (more interpretable for some parameters)
+round(exp(est_ci(mlo$opt$par,ho)),2) #parameters living on the positive halv-line (more interpretable for some parameters)
 
 #### Occupancy probabilities (with confidence bands), for some specific covariate values
 tval <- seq(0.01,30,length=50)
-p0_ci <- occupancy_prob_ci_band("well",tval,mlo$par,gg,hessian=ho)
-p1_ci <- occupancy_prob_ci_band("mild",tval,mlo$par,gg,hessian=ho)
-p2_ci <- occupancy_prob_ci_band("severe",tval,mlo$par,gg,hessian=ho)
-p3_ci <- occupancy_prob_ci_band("death",tval,mlo$par,gg,hessian=ho)
+p0_ci <- occupancy_prob_ci_band(1,tval,mlo$opt$par,gg,hessian=ho)
+p1_ci <- occupancy_prob_ci_band(2,tval,mlo$opt$par,gg,hessian=ho)
+p2_ci <- occupancy_prob_ci_band(3,tval,mlo$opt$par,gg,hessian=ho)
+p3_ci <- occupancy_prob_ci_band(4,tval,mlo$opt$par,gg,hessian=ho)
 
 
 # msm package with covariates (to get non-parameteric prevalence curves)
@@ -83,13 +81,13 @@ lines(tval,p1_ci$est*100,col="#0571b0",lwd=3)
 
 
 plot(tval,prev_np$`Observed percentages`[,3],type="l",col="dark grey",ylim=c(0,100),lwd=3,xlab="years after transplantation",
-     ylab="prevalence (%)",main="State 2")
+     ylab="prevalence (%)",main="severe")
 polygon(c(tval, rev(tval)), c(p2_ci$upper*100, rev(p2_ci$lower*100)),
         col = adjustcolor("#0571b0",alpha.f=0.2), border=NA)
 lines(tval,p2_ci$est*100,col="#0571b0",lwd=3)
 
 plot(tval,prev_np$`Observed percentages`[,4],type="l",col="dark grey",ylim=c(0,100),lwd=3,xlab="years after transplantation",
-     ylab="prevalence (%)",main="State 3")
+     ylab="prevalence (%)",main="death")
 polygon(c(tval, rev(tval)), c(p3_ci$upper*100, rev(p3_ci$lower*100)),
         col = adjustcolor("#0571b0",alpha.f=0.2), border=NA)
 lines(tval,p3_ci$est*100,col="#0571b0",lwd=3)
@@ -97,7 +95,7 @@ lines(tval,p3_ci$est*100,col="#0571b0",lwd=3)
 
 #### Overall survival curves (with confidence bands), for some specific covariate values
 tval <- seq(0.01,30,length=50)
-So <- overall_survival_ci_band(tval,mlo$par,gg,hessian=ho)
+So <- overall_survival_ci_band(tval,mlo$opt$par,gg,hessian=ho)
 
 
 par(bty="l")
@@ -115,11 +113,11 @@ lines(tval,So$est,col="#0571b0",lwd=3)
 #### Transition probabilities (with confidence bands)
 tval <- seq(10,40,length=50)
 vt <- 10
-t01_ci <- transition_prob_ci_band("well-mild",tval,vt,mlo$par,gg,hessian=ho)
-t12_ci <- transition_prob_ci_band("mild-severe",tval,vt,mlo$par,gg,hessian=ho)
-t23_ci <- transition_prob_ci_band("severe-death",tval,vt,mlo$par,gg,hessian=ho)
-t13_ci <- transition_prob_ci_band("mild-death",tval,vt,mlo$par,gg,hessian=ho)
-t03_ci <- transition_prob_ci_band("well-death",tval,vt,mlo$par,gg,hessian=ho)
+t01_ci <- transition_prob_ci_band("1-2",tval,vt,mlo$opt$par,gg,hessian=ho)
+t12_ci <- transition_prob_ci_band("2-3",tval,vt,mlo$opt$par,gg,hessian=ho)
+t23_ci <- transition_prob_ci_band("3-4",tval,vt,mlo$opt$par,gg,hessian=ho)
+t13_ci <- transition_prob_ci_band("2-4",tval,vt,mlo$opt$par,gg,hessian=ho)
+t03_ci <- transition_prob_ci_band("1-4",tval,vt,mlo$opt$par,gg,hessian=ho)
 
 
 par(bty="l")
@@ -140,6 +138,6 @@ lines(tval,t12_ci$est,lwd=3,col="#5ab4ac")
 lines(tval,t23_ci$est,lwd=3,col="#f6e8c3")
 lines(tval,t13_ci$est,lwd=3,col="#d8b365")
 lines(tval,t03_ci$est,lwd=3,col="#8c510a")
-legend("right",legend=c("well-mild","mild-severe","severe-death","mild-death","well-death"),
+legend(x=32,y=0.8,legend=c("well-mild","mild-severe","severe-death","mild-death","well-death"),
        col=c("#5ab4ac","#01665e","#f6e8c3","#d8b365","#8c510a"),lwd=2,bty="n",cex=1)
 
