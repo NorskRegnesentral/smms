@@ -1,6 +1,9 @@
 ---
-title: "smms: analysing CAV data with simple exponential model, without covariates"
-output: pdf_document
+title: "smms: analysing CAV data with simple exponential model, \\ without covariates"
+output: 
+  pdf_document:
+    toc: true
+    number_sections: true
 vignette: >
   %\VignetteIndexEntry{smms: analysing CAV data with simple exponential model, without covariates}
   %\VignetteEngine{knitr::rmarkdown}
@@ -28,12 +31,14 @@ library(msm) # To get the CAV dataset
 dd = cav
 dd = dd[!is.na(dd$pdiag),]
 
-# Remove observations where the patient appears to go back to a previous state (assumed to be impossible):
+# Remove observations where the patient appears to go back to a previous state
+# (assumed to be impossible):
 id_wrong = unique(dd$PTNUM[which(dd$state!=dd$statemax)])  
 dd = dd[-which(dd$PTNUM %in% id_wrong),]
 
 dd = dd[ ,-c(2, 5, 7, 9, 10)]
-colnames(dd)[1:2] <- c("patient","time") # rename relevant columns (necessary in current version)
+# rename relevant columns (necessary in current version):
+colnames(dd)[1:2] <- c("patient","time") 
 ddo = dd
 
 # Change state names from 1,2,3,4 to well, mild, severe, death
@@ -49,7 +54,8 @@ Here we assume a four-state illness death model, since we consider CAV to be irr
 
 ```{r}
 # Specify the graph:
-gg = graph_from_literal("well"--+"mild"--+"severe"--+"death", "well"--+"death", "mild"--+"death")
+gg = graph_from_literal("well"--+"mild"--+"severe"--+"death", "well"--+"death", 
+                        "mild"--+"death")
 par(mar=c(1,1,1,1))
 plot(gg,layout=layout_with_sugiyama(gg,layers=c(1,1,1,2))$layout,vertex.size=40)
 ```
@@ -126,10 +132,11 @@ In the `smms` package, we have included code for computing various functions of 
 Gives the  probability that a patient is found in state $i$ at time $t$. The state should be provided using the user-defined names:
 
 ```{r}
-tval <- seq(0.01,30,length=50) # a sequence of time-points over which to compute the state occupancies
+tval <- seq(0.01,30,length=50) 
+# a sequence of time-points over which to compute the state occupancies
 p0_ci <- occupancy_prob_ci_band("well",tval,mlo$opt$par,gg,hessian=mlo$hess) 
-#for computing the confidence bands, the hessian needs to be provided (but there exists a function 
-# computing only the occupancy probabilities too)
+#for computing the confidence bands, the hessian needs to be provided (but there
+# exists a function computing only the occupancy probabilities too)
 p1_ci <- occupancy_prob_ci_band("mild",tval,mlo$opt$par,gg,hessian=mlo$hess)
 p2_ci <- occupancy_prob_ci_band("severe",tval,mlo$opt$par,gg,hessian=mlo$hess)
 p3_ci <- occupancy_prob_ci_band("death",tval,mlo$opt$par,gg,hessian=mlo$hess)
@@ -139,9 +146,12 @@ Plot the occupancy probabilities (the green lines are the fitted state occupanci
 
 ```{r, fig.width=6,fig.align = "center",fig.height=4}
 # msm package with covariates (to get non-parameteric prevalence curves)
-oneway4.q <- rbind(c(0, 0.25, 0, 0.25), c(0, 0, 0.25, 0.25),c(0, 0, 0, 0.5), c(0, 0, 0, 0))
-rownames(oneway4.q) <- colnames(oneway4.q) <- c("Well", "Mild","Severe", "Death")
-cav.msm <- msm(state ~ time, subject = patient, data = ddo,qmatrix = oneway4.q, death = 4,method = "BFGS")
+oneway4.q <- rbind(c(0, 0.25, 0, 0.25), c(0, 0, 0.25, 0.25),c(0, 0, 0, 0.5), 
+                   c(0, 0, 0, 0))
+rownames(oneway4.q) <- colnames(oneway4.q) <- c("Well", "Mild","Severe", 
+                                                "Death")
+cav.msm <- msm(state ~ time, subject = patient, data = ddo,qmatrix = oneway4.q,
+               death = 4,method = "BFGS")
 
 prev_np <- prevalence.msm(cav.msm,times=tval)
 
@@ -149,8 +159,8 @@ prev_np <- prevalence.msm(cav.msm,times=tval)
 par(bty="l")
 par(mar=c(4,4,1,2))
 par(cex=1)
-plot(tval,prev_np$`Observed percentages`[,1],type="l",ylim=c(0,100),lwd=3,xlab="time",col="dark grey",
-     ylab="prevalence (%)")
+plot(tval,prev_np$`Observed percentages`[,1],type="l",ylim=c(0,100),lwd=3,
+     xlab="time",col="dark grey", ylab="prevalence (%)")
 polygon(c(tval, rev(tval)), c(p0_ci$upper*100, rev(p0_ci$lower*100)),
         col = adjustcolor("#b2e2e2",alpha.f=0.2), border=NA)
 lines(tval,p0_ci$est*100,col="#b2e2e2",lwd=3)
@@ -172,7 +182,8 @@ polygon(c(tval, rev(tval)), c(p3_ci$upper*100, rev(p3_ci$lower*100)),
 lines(tval,p3_ci$est*100,col="#006d2c",lwd=3)
 
 legend("right",legend=c("non-parametric","well","mild","severe","death"),
-       col=c("dark grey","#b2e2e2","#66c2a4","#2ca25f","#006d2c"),lwd=2,bty="n",cex=1)
+       col=c("dark grey","#b2e2e2","#66c2a4","#2ca25f","#006d2c"),
+       lwd=2,bty="n",cex=1)
 
 ```
 
@@ -188,8 +199,9 @@ So <- overall_survival_ci_band(tval,mlo$opt$par,gg,hessian=mlo$hess)
 par(bty="l")
 par(mar=c(4,4,2,2))
 par(cex=1)
-plot.survfit.msm(cav.msm, col.surv="dark grey",lwd.surv=2,xlab="years after transplantation",
-                 ylab="survival",main=" ",legend.pos=c(30,2),col=NULL,lwd=3)
+plot.survfit.msm(cav.msm, col.surv="dark grey",lwd.surv=2,col=NULL,lwd=3,
+                 xlab="years after transplantation",ylab="survival",main=" ",
+                 legend.pos=c(30,2))
 # using msm package for the nonparametric estimate (for now)
 polygon(c(tval, rev(tval)), c(So$upper, rev(So$lower)),
         col = adjustcolor("#0571b0",alpha.f=0.2), border=NA)
@@ -204,11 +216,16 @@ The probability that a patient is found in state i at a time-point $t$ given tha
 ```{r}
 tval <- seq(10,40,length=50)
 vt <- 10
-t01_ci <- transition_prob_ci_band("well-mild",tval,vt,mlo$opt$par,gg,hessian=mlo$hess)
-t12_ci <- transition_prob_ci_band("mild-severe",tval,vt,mlo$opt$par,gg,hessian=mlo$hess)
-t23_ci <- transition_prob_ci_band("severe-death",tval,vt,mlo$opt$par,gg,hessian=mlo$hess)
-t13_ci <- transition_prob_ci_band("mild-death",tval,vt,mlo$opt$par,gg,hessian=mlo$hess)
-t03_ci <- transition_prob_ci_band("well-death",tval,vt,mlo$opt$par,gg,hessian=mlo$hess)
+t01_ci <- transition_prob_ci_band("well-mild",tval,vt,mlo$opt$par,gg,
+                                  hessian=mlo$hess)
+t12_ci <- transition_prob_ci_band("mild-severe",tval,vt,mlo$opt$par,gg,
+                                  hessian=mlo$hess)
+t23_ci <- transition_prob_ci_band("severe-death",tval,vt,mlo$opt$par,gg,
+                                  hessian=mlo$hess)
+t13_ci <- transition_prob_ci_band("mild-death",tval,vt,mlo$opt$par,gg,
+                                  hessian=mlo$hess)
+t03_ci <- transition_prob_ci_band("well-death",tval,vt,mlo$opt$par,gg,
+                                  hessian=mlo$hess)
 ```
 
 Plot the transition probabilities (the colored lines are the fitted transition probabilities):
@@ -217,7 +234,8 @@ Plot the transition probabilities (the colored lines are the fitted transition p
 par(bty="l")
 par(mar=c(4,4,2,2))
 par(cex=1)
-plot(tval,t01_ci$est,type="l",ylim=c(0,1),col="#5ab4ac",lwd=3,ylab="transition probability",xlab="time")
+plot(tval,t01_ci$est,type="l",ylim=c(0,1),col="#5ab4ac",lwd=3,
+     ylab="transition probability",xlab="time")
 polygon(c(tval, rev(tval)), c(t01_ci$upper, rev(t01_ci$lower)),
         col = adjustcolor("#0571b0",alpha.f=0.2), border=NA)
 polygon(c(tval, rev(tval)), c(t12_ci$upper, rev(t12_ci$lower)),
@@ -232,8 +250,10 @@ lines(tval,t12_ci$est,lwd=3,col="#5ab4ac")
 lines(tval,t23_ci$est,lwd=3,col="#f6e8c3")
 lines(tval,t13_ci$est,lwd=3,col="#d8b365")
 lines(tval,t03_ci$est,lwd=3,col="#8c510a")
-legend(x=32,y=0.8,legend=c("well-mild","mild-severe","severe-death","mild-death","well-death"),
-       col=c("#5ab4ac","#01665e","#f6e8c3","#d8b365","#8c510a"),lwd=2,bty="n",cex=0.8)
+legend(x=32,y=0.8,legend=c("well-mild","mild-severe","severe-death",
+                           "mild-death","well-death"),
+       col=c("#5ab4ac","#01665e","#f6e8c3","#d8b365","#8c510a"),
+       lwd=2,bty="n",cex=0.8)
 
 ```
 
