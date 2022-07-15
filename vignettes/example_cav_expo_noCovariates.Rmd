@@ -1,8 +1,8 @@
 ---
 title: "smms: analysing CAV data with simple exponential model, without covariates"
-output: rmarkdown::html_vignette
+output: pdf_document
 vignette: >
-  %\VignetteIndexEntry{example_cav_expo_noCovariates}
+  %\VignetteIndexEntry{smms: analysing CAV data with simple exponential model, without covariates}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -248,8 +248,8 @@ write_loglikelihood(gg,abs_exact = T)
 
 This function will write a txt file with the log-likelihood formula to the working directory.
 
-$$
-\begin{aligned}
+
+\begin{align*}
  \ell_n (\theta)=  &\sum_{k=0}^{n_{0}} \log \{   S_{01} ( t_{0M} ) S_{03} ( t_{0M} )    \} + \sum_{k=0}^{n_{01}} \log \{\int_{t_{0M}}^{t_{1m}}  f_{01} ( s )  S_{03} ( s )  S_{12} ( t_{1M}-s ) S_{13} ( t_{1M}-s )   \,ds\} + \\
  &\sum_{k=0}^{n_{012}} \log \{\int_{t_{0M}}^{t_{1m}} \int_{t_{1M}-s}^{t_{2m}-s}  f_{01} ( s ) f_{12} ( u )  S_{03} ( s ) S_{13} ( u )  S_{23} ( t_{2M}-s-u )   \,du \,ds\} + \\
  &\sum_{k=0}^{n_{02}} \log \{\int_{t_{0M}}^{t_{2m}} \int_{0}^{t_{2m}-s}  f_{01} ( s ) f_{12} ( u )  S_{03} ( s ) S_{13} ( u )  S_{23} ( t_{2M}-s-u )   \,du \,ds\} + \\
@@ -259,6 +259,5 @@ $$
  &\sum_{k=0}^{n_{013}} \log \{\int_{t_{0M}}^{t_{1m}} \int_{t_{1M}-s}^{t_{3m}-s}  f_{01} ( s ) f_{12} ( u ) f_{23} ( t_{3m}- s- u )  S_{03} ( s ) S_{13} ( u )    \,du \,ds + \\
  &\int_{t_{0M}}^{t_{1m}}  f_{01} ( s ) f_{13} ( t_{3m}- s )  S_{03} ( s ) S_{12} ( t_{3m}- s )    \,ds\} + \\
  &\sum_{k=0}^{n_{023}} \log \{\int_{t_{0M}}^{t_{2m}} \int_{0}^{t_{2m}-s}  f_{01} ( s ) f_{12} ( u ) f_{23} ( t_{3m}- s- u )  S_{03} ( s ) S_{13} ( u )    \,du \,ds\} . 
+\end{align*}
 
-\end{aligned}
-$$
