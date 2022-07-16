@@ -1,15 +1,15 @@
 ---
-title: "smms: analysing CAV data with simple exponential model,\\ with covariates"
+title: "smms: analysing CAV data with a Weibull-GenWeibull model,\\ with covariates"
 output: 
   pdf_document:
-    toc: true
-    number_sections: true
+  toc: true
+number_sections: true
 vignette: >
-  %\VignetteIndexEntry{smms: analysing CAV data with simple exponential model, with covariates}
+  %\VignetteIndexEntry{smms: analysing CAV data with a Weibull-GenWeibull model, with covariates}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
-
+  
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
@@ -70,34 +70,56 @@ plot(gg,layout=layout_with_sugiyama(gg,layers=c(1,1,1,2))$layout,vertex.size=20)
 
 # Specifying parametric models 
 
-Then, the user has to specify parametric models for all transition times (meaning one for each edge in the graph). In the current version of the package, these models have to be specified by providing density functions (in a specific format detailed below), as well as the corresponding survival functions. The functions will look like the following if one chooses to use simple exponential models for all transitions:
-
+Then, the user has to specify parametric models for all transition times (meaning one for each edge in the graph). In the current version of the package, these models have to be specified by providing density functions (in a specific format detailed below), as well as the corresponding survival functions. The functions will look like the following using a mix of ordinary Weibull models, and the generalised Weibull model. The models used here are described in more detail in the Aastveit, Cunen and Hjort (2022) paper. 
+  
 ```{r}
-S_01 = function(param, x, t){(1-pexp(t,exp(param[1]+param[2]*x[1]+param[3]*x[2])))}
-S_12 = function(param, x, t){(1-pexp(t,exp(param[4]+param[5]*x[1]+param[6]*x[2])))}
-S_23 = function(param, x, t){(1-pexp(t,exp(param[7]+param[8]*x[1]+param[9]*x[2])))}
-S_03 = function(param, x, t){(1-pexp(t,exp(param[10]+param[11]*x[1]+param[12]*x[2])))}
-S_13 = function(param, x, t){(1-pexp(t,exp(param[13]+param[14]*x[1]+param[15]*x[2])))}
+# User defined density and survival function for the generalised Weibull:
+pXweibull <- function(tt,a,b,th){
+  pp <- 1-exp(1-(1+(tt/b)^a)^(1/th))
+  pp[tt<0] <- 0 #to ensure that the survival function returns 1 when tt<0
+  return(pp)
+}
+dXweibull <- function(tt,a,b,th){
+  (1/th)*(a/b)*(tt/b)^(a-1)*(1+(tt/b)^a)^(1/th-1)*exp(1-(1+(tt/b)^a)^(1/th))
+}
 
-f_01 = function(param, x, t){dexp(t,exp(param[1]+param[2]*x[1]+param[3]*x[2]))}
-f_12 = function(param, x, t){dexp(t,exp(param[4]+param[5]*x[1]+param[6]*x[2]))}
-f_23 = function(param, x, t){dexp(t,exp(param[7]+param[8]*x[1]+param[9]*x[2]))}
-f_03 = function(param, x, t){dexp(t,exp(param[10]+param[11]*x[1]+param[12]*x[2]))}
-f_13 = function(param, x, t){dexp(t,exp(param[13]+param[14]*x[1]+param[15]*x[2]))}
+# Model:
+S_01 = function(param, x, t){1-pweibull(t,exp(param[1]),
+                                         exp(param[2]+param[3]*x[1]+param[4]*x[2]))}
+S_12 = function(param, x, t){1-pweibull(t,exp(param[5]),
+                                         exp(param[6]+param[7]*x[1]+param[8]*x[2]))}
+S_23 = function(param, x, t){1-pweibull(t,exp(param[9]),
+                                         exp(param[10]+param[11]*x[1]+param[12]*x[2]))}
+S_03 = function(param, x, t){1-pXweibull(t,exp(param[13]),
+                                          exp(param[14]+param[15]*x[1]+param[16]*x[2]),
+                                          exp(param[17]))}
+S_13 = function(param, x, t){1-pweibull(t,exp(param[18]),exp(param[19]))}
+
+
+f_01 = function(param, x, t){dweibull(t,exp(param[1]),
+                                      exp(param[2]+param[3]*x[1]+param[4]*x[2]))}
+f_12 = function(param, x, t){dweibull(t,exp(param[5]),
+                                      exp(param[6]+param[7]*x[1]+param[8]*x[2]))}
+f_23 = function(param, x, t){dweibull(t,exp(param[9]),
+                                      exp(param[10]+param[11]*x[1]+param[12]*x[2]))}
+f_03 = function(param, x, t){dXweibull(t,exp(param[13]),
+                                       exp(param[14]+param[15]*x[1]+param[16]*x[2]),
+                                       exp(param[17]))}
+f_13 = function(param, x, t){dweibull(t,exp(param[18]),exp(param[19]))}
 ```
 
-Here we let the covariates influence all transition.
+Here we let the covariates influence all transition, except for the transition between mild and death ("1-3" in the interal naming system, "2-4" using the user defined names).
 
 Important to note:
-
+  
 * **the names of the functions**: these have to be in the form `f_ij` and `S_ij` with i indicating the source state (in the internal numbering system) and j indicating the receiving state. More details on the naming convention below.
 * **the arguments of the functions**: these should always be given as `(param, x, tt)` as above. `x` points to the vector of measured covariates (for a patient).
 * **the scale of the parameters**: for the sake of stable optimisation it is convenient that the parameters live on the real line (instead of the positive half-line as in the common parameterisation of the exponential distribution). Therefore, we include an exponential transformation of the `param` vector, and we recommend that transformation for all positive parameters.
 * **the ordering of the parameters**: `param` denotes the full parameter vector for the model.
-* Survival functions should be written so that they return 1 when `tt` is negative. Using build-in R CDFs for distributions over the positive half-line will ensure this. Otherwise, if the user codes the survival functions herself, she should ensure that they return 1 when `tt` is negative. 
+* Survival functions should be written so that they return 1 when `tt` is negative. Using build-in R CDFs for distributions over the positive half-line will ensure this. Otherwise, if the user codes the survival functions herself, she should ensure that they return 1 when `tt` is negative (see the R chunck above). 
 
 As we saw above, the user has to follow a strict naming convention when specifying the densities and survival functions: within the package, the states are numbered from $0$ to $k-1$ ($k$ being the number of states), in a specific order which depends on the graph. To find out how the user defined state names relate to the internal numbering system, use the `names_of_survival_density` function.  This is always recommended before specifying the model:
-
+  
 ```{r}
 print(names_of_survival_density(gg))
 ```
@@ -106,26 +128,27 @@ Here we see for example that the density for the edge between "2" and "3" should
 # Fitting the model
 
 Now we have everything in place in order to fit the multi-state model we have specified above:
-
+  
 ```{r,eval=F}
-startval <- c(-2.5,0.21,0.5,-1.1,-0.2,0.2,-1.2,-0.1,-0.5,
-              -3.1,0.5,0.3,-2.8,-1.1,1.1)
+startval <- c(0.36,2.38,-0.18,-0.30,-0.08,7.13,0.23,-0.33,
+              -0.55,7.92,0.18,0.36,-0.98,7.35,0,0,-0.09,
+              0,0)
 
-mlo <- smms(startval,dd,gg,X_data, mc_cores = 1,hessian_matrix=T) 
+mlo <- smms(startval,dd,gg,X_data, mc_cores = 5,hessian_matrix=T)
 #calculates hessian too, slow with 1 core
 ```
 
 One needs some start values for the optimisation, and we will soon add a function which calculates good starting values for a given model. Increasing the number of cores will make optimisation faster (but will not work on Windows machines). Here we choose to compute the hessian matrix too, which takes a bit more time. With one core this might take some time to compute.
 
 ```{r,echo=F}
-load("cav_expo_cov_optims")
+load("cav_wei_genwei_optims")
 ```
 
 We can compute AIC, and look at the estimated parameters and approximate 95% confidence intervals. 
 
 ```{r}
 # Compute AIC (higher values are better with this definition)
-aic <- (-2*mlo$opt$objective)-2*length(mlo$opt$par) #-2851.2
+aic <- (-2*mlo$opt$objective)-2*length(mlo$opt$par) #-2786.5
 
 # Look at estimates and 95% confidence intervals. 
 # On the -Inf to Inf scale:
@@ -143,7 +166,9 @@ In the `smms` package, we have included code for computing various functions of 
 
 Gives the  probability that a patient is found in state $i$ at time $t$. The state should be provided using the user-defined names (hence 1-4 below, instead of 0-3). When covariates are present, one has to choose some specific covariate values for which to compute the probabilities (here I let the first covariate take values 1, older donor, and -1, younger donor, and the second covariate take value 0, no IHD, and 1, IHD).
 
-```{r}
+\footnotesize
+
+```{r,eval=F}
 tval <- seq(0.01,30,length=50) 
 p0_y0_ci <- occupancy_prob_ci_band("1",tval,mlo$opt$par,gg,xval=c(-1,0),mlo$hess)
 p0_y1_ci <- occupancy_prob_ci_band("1",tval,mlo$opt$par,gg,xval=c(-1,1),mlo$hess)
@@ -163,9 +188,14 @@ p3_o0_ci <- occupancy_prob_ci_band("4",tval,mlo$opt$par,gg,xval=c(1,0),mlo$hess)
 p3_o1_ci <- occupancy_prob_ci_band("4",tval,mlo$opt$par,gg,xval=c(1,1),mlo$hess)
 ```
 
+\normalsize
+
 Plot the occupancy probabilities (the colored lines are the fitted state occupancies, the grey lines are the non-parametric estimates):
 
+\footnotesize
+
 ```{r, fig.width=8,fig.align = "center",fig.height=5}
+tval <- seq(0.01,30,length=50) 
 # msm package  (to get non-parameteric prevalence curves)
 oneway4.q <- rbind(c(0, 0.25, 0, 0.25), c(0, 0, 0.25, 0.25),c(0, 0, 0, 0.5), 
                    c(0, 0, 0, 0))
@@ -250,18 +280,24 @@ lines(tval,p3_o1_ci$est*100,col="#ca0020",lwd=3,lty=2)
 
 ```
 
+\normalsize
 
 ## Overall survival
 
 The overall survival curve gives the probability of not having reached an absorbing state at time $t$. The grey line is the Kaplan-Meier estimator, the colored lines are the fitted lines from the model. When covariates are present, one has to choose some specific covariate values for which to compute the survival curves (here I let the first covariate take values 1, older donor, and -1, younger donor, and the second covariate take value 0, no IHD, and 1, IHD).
 
-```{r,message=F,error=F, fig.width=6,fig.align = "center",fig.height=4}
+\footnotesize
+```{r,eval=F}
 tval <- seq(0.01,20,length=50)
 Sy0 <- overall_survival_ci_band(tval,mlo$opt$par,gg,c(-1,0),mlo$hess)
 Sy1 <- overall_survival_ci_band(tval,mlo$opt$par,gg,c(-1,1),mlo$hess)
 So0 <- overall_survival_ci_band(tval,mlo$opt$par,gg,c(1,0),mlo$hess)
 So1 <- overall_survival_ci_band(tval,mlo$opt$par,gg,c(1,1),mlo$hess)
+```
 
+
+```{r,message=F,error=F, fig.width=6,fig.align = "center",fig.height=4}
+tval <- seq(0.01,20,length=50)
 par(mfrow=c(1,1))
 par(bty="l")
 par(mar=c(4,4,2,2))
@@ -288,7 +324,7 @@ legend("topright",legend=c("youger donor, no IHD","youger donor, IHD",
        lty=c(1,1,2,2),cex=0.7)
 
 ```
-
+\normalsize
 
 ## Transition probabilities
 
@@ -296,7 +332,7 @@ The probability that a patient is found in state i at a time-point $t$ given tha
 
 \footnotesize
 
-```{r}
+```{r,eval=F}
 tval <- seq(10,40,length=50)
 vt <- 10
 t01_y0_ci <- transition_prob_ci_band("1-2",tval,vt,mlo$opt$par,gg,xval=c(-1,0),
@@ -327,7 +363,11 @@ t03_o1_ci <- transition_prob_ci_band("1-4",tval,vt,mlo$opt$par,gg,xval=c(1,1),he
 
 Plot the transition probabilities (the colored lines are the fitted transition probabilities):
 
+\footnotesize
+  
 ```{r, fig.width=8,fig.align = "center",fig.height=5}
+tval <- seq(10,40,length=50)
+
 par(mfrow=c(2,3))
 par(bty="l")
 par(mar=c(4,4,2,2))
@@ -412,3 +452,5 @@ legend("right",legend=c("youger donor, no IHD","youger donor, IHD",
        bty="n",lty=c(1,1,2,2),cex=0.7)
 
 ```
+
+\normalsize
