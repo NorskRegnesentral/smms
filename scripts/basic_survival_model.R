@@ -12,7 +12,7 @@ plot(gg,layout=layout_with_sugiyama(gg,layers=c(1,2))$layout,vertex.size=20)
 #write_loglikelihood(gg,abs_exact=T)
 
 # Data:
-dd <- read.table(file="boag1949_breastCancer.csv",header=T,sep=";",dec=",")
+dd <- read.table(file="boag1949_breastCancer.csv",header=T,sep=";",dec=",",skip=2)
 colnames(dd) <- c("time","state")
 
 dd <- as.data.frame(dd)
