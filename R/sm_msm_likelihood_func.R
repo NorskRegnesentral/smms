@@ -58,7 +58,11 @@ type_to_integrand = function(form_type,edge_mats,names_surv_dens,abs_exact=TRUE)
   
   # Determine the integral dimension
   dim_integral <- max(travi)
-  intoAbs <- colnames(travi)[which.max(travi)] %in% edge_abs
+  if (max(travi)>0){
+    intoAbs <- colnames(travi)[which.max(travi)] %in% edge_abs
+  }else{
+    intoAbs <- FALSE
+  }
   choice <- (length(which(passi==max(travi)))>0)   #TRUE: if absorbing state is reached from a state where there was an option to go a different way
   if (intoAbs){
     if(abs_exact==TRUE) dim_integral <- dim_integral-1

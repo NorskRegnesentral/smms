@@ -90,7 +90,11 @@ relevant_timepoints = function(data, graph){
       min_state <- state_ord$state[which(state_ord$order==min(ddi$state))]
       dists_init <- dists[,colnames(dists)%in%state_ord$state[which(state_ord$type=="init")],drop=F]
       id_init_min <- colnames(dists_init)[which.min(dists_init[min_state,])]
-      ddi_1 <- c(inds[i],0,state_ord$order[which(state_ord$state==id_init_min)])
+      ddi_1 <- ddi[1,]
+      ddi_1$patient <- inds[i]
+      ddi_1$time <- 0
+      ddi_1$state <- state_ord$order[which(state_ord$state==id_init_min)]
+      #ddi_1 <- c(inds[i],0,state_ord$order[which(state_ord$state==id_init_min)])
       ddi <- rbind(ddi_1,ddi)
       ddr <- rbind(ddi,ddr[-which(ddr$patient==inds[i]),])
     }else{
