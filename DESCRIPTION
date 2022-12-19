@@ -1,6 +1,6 @@
 Package: smms
 Title: Semi-Markov Multi-State models for interval censored data
-Version: 0.0.0.9000
+Version: 0.0.1
 Authors@R: c(
     person(given = "Céline",
            family = "Cunen",
