@@ -3,24 +3,24 @@ library(Rlab)
 library(numDeriv)
 library(parallel)
 
-## Simulations when the competing risks approach is true. 
+## Example of how to perform simulations when the competing risks approach is true. 
 nn = 100
 
-theta_hat_par_embed = matrix(NA, nrow = nn, ncol = 10)
-theta_hat_solve_hessian_embed = matrix(NA, nrow = nn, ncol = 10)
+theta_hat_par_embed = matrix(NA, nrow = nn, ncol = 11)
+theta_hat_solve_hessian_embed = matrix(NA, nrow = nn, ncol = 11)
 
-theta_hat_par_semi2_comp = matrix(NA, nrow = nn, ncol = 9)
-theta_hat_solve_hessian_semi2_comp = matrix(NA, nrow = nn, ncol = 9)
+theta_hat_par_comp = matrix(NA, nrow = nn, ncol = 9)
+theta_hat_solve_hessian_comp = matrix(NA, nrow = nn, ncol = 9)
 
 ## Initial survival function
-S_01_embed = function(a, t, x){exp(a[3])*(1-pweibull(t,exp(a[1] + a[8]*x), exp(a[2])))}
+S_01_embed = function(a, t, x){exp(a[3]+a[11]*x)/(1+exp(a[3]+a[11]*x))*(1-pweibull(t,exp(a[1] + a[8]*x), exp(a[2])))}
 S_12_embed = function(a, t, x){(1-pweibull(t,exp(a[4] + a[9]*x), exp(a[5])))}
-S_02_embed = function(a, t, x){(1-exp(a[3]))*(1-pweibull(t, exp(a[6]+a[10]*x), exp(a[7])))}
+S_02_embed = function(a, t, x){(1-(exp(a[3]+a[11]*x)/(1+exp(a[3]+a[11]*x))))*(1-pweibull(t, exp(a[6]+a[10]*x), exp(a[7])))}
 
 ## Initial density functions - derivative of -survival function
-f_01_embed = function(a,  t,x){exp(a[3])*dweibull(t,exp(a[1] + a[8]*x), exp(a[2]))}
+f_01_embed = function(a,  t,x){exp(a[3]+a[11]*x)/(1+exp(a[3]+a[11]*x))*dweibull(t,exp(a[1] + a[8]*x), exp(a[2]))}
 f_12_embed = function(a, t, x){dweibull(t,exp(a[4] + a[9]*x), exp(a[5]))}
-f_02_embed = function(a, t, x){(1-exp(a[3]))*dweibull(t,exp(a[6] + a[10]*x), exp(a[7]))}
+f_02_embed = function(a, t, x){(1-(exp(a[3]+a[11]*x)/(1+exp(a[3]+a[11]*x))))*dweibull(t,exp(a[6] + a[10]*x), exp(a[7]))}
 
 ## Initial survival function
 S_01_comp = function(a, t, x){(1-pweibull(t,exp(a[1] + a[7]*x), exp(a[2])))}
@@ -98,7 +98,7 @@ simulation_t = function(param, n){
 ## Competing risks approach
 sum_all_comp = function(a, t_type0, t_type1, t_type2, t_type3, mc_cores){
   type_1_comp = -sum(unlist(mclapply(1:nrow(t_type0), function(i) (log(S_01_comp(a = a,  t = t_type0[i, 1], x = t_type0[i, 2])*
-                                                                          S_02_comp(a = a,  t = t_type0[i, 1], x = t_type0[i, 2]))))))
+                                                                         S_02_comp(a = a,  t = t_type0[i, 1], x = t_type0[i, 2]))))))
   type_2_comp = -sum(unlist(mclapply(1:nrow(t_type1), function(i)(log(as.numeric(
     integrate(f01_S12_S02_comp, lower = t_type1[i,1], upper = t_type1[i,2], w = t_type1[i,3], 
               a = a, x = t_type1[i, 4])[1]))),mc.cores = mc_cores), use.names = FALSE))
@@ -106,7 +106,7 @@ sum_all_comp = function(a, t_type0, t_type1, t_type2, t_type3, mc_cores){
     integrate(f01_f12_S02_comp, lower = t_type2[i,1], upper = t_type2[i,2], 
               w = t_type2[i,3], a = a, x = t_type2[i, 4])[1]))),mc.cores = mc_cores), use.names = FALSE))
   type_4_comp = -sum(unlist(mclapply(1:nrow(t_type3), function(i) (log(f_02_comp(a = a,  t = t_type3[i, 1], x = t_type3[i, 2])*
-                                                                          S_01_comp(a = a,  t = t_type3[i, 1], x = t_type3[i, 2]))))))
+                                                                         S_01_comp(a = a,  t = t_type3[i, 1], x = t_type3[i, 2]))))))
   
   return(type_1_comp + type_2_comp + type_3_comp + type_4_comp) 
 }
@@ -134,7 +134,7 @@ for(mn in 1:nn){
   print(mn)
   eps = 0.001
   param_comp = c(0.4,  0.6,  1.6, -0.5, 0.2,  1.1, -0.9, -1.2, 0)
-  param_embed = c(0.4,  0.6,-1.2, 1.6, -0.5, 0.2,  1.1, -0.9, -1.2, 0)
+  param_embed = c(0.4,  0.6,-1.2, 1.6, -0.5, 0.2,  1.1, -0.9, -1.2, 0, -0.8)
   n = 1000
   t = simulation_t(param_comp, n)
   
@@ -149,7 +149,7 @@ for(mn in 1:nn){
   
   
   theta_hat_embed = nlminb(param_embed, sum_all_embed,t_type0 = t_type0, t_type1 = t_type1, t_type2 = t_type2,
-                     t_type3 = t_type3, mc_cores = 3)
+                           t_type3 = t_type3, mc_cores = 3)
   
   theta_hat_middle_comp = as.matrix(theta_hat_comp$par)
   theta_hat_par_comp[mn, 1] = theta_hat_middle_comp[1, 1]
@@ -163,8 +163,8 @@ for(mn in 1:nn){
   theta_hat_par_comp[mn, 9] = theta_hat_middle_comp[9, 1]
   
   theta_hat_hessian_comp = hessian(sum_all_comp, theta_hat_comp$par, t_type0 = t_type0, t_type1 = t_type1, 
-                                    t_type2 = t_type2, t_type3 = t_type3,
-                                    mc_cores = 3)
+                                   t_type2 = t_type2, t_type3 = t_type3,
+                                   mc_cores = 3)
   theta_hat_hessian_solved_comp = solve(theta_hat_hessian_comp)
   theta_hat_solve_hessian_comp[mn, 1] = theta_hat_hessian_solved_comp[1, 1]
   theta_hat_solve_hessian_comp[mn, 2] = theta_hat_hessian_solved_comp[2, 2]
@@ -187,6 +187,7 @@ for(mn in 1:nn){
   theta_hat_par_embed[mn, 8] = theta_hat_middle[8, 1]
   theta_hat_par_embed[mn, 9] = theta_hat_middle[9, 1]
   theta_hat_par_embed[mn, 10] = theta_hat_middle[10, 1]
+  theta_hat_par_embed[mn, 11] = theta_hat_middle[11, 1]
   
   
   theta_hat_hessian_embed = hessian(sum_all_embed, theta_hat_embed$par, t_type0 = t_type0, t_type1 = t_type1, t_type2 = t_type2, t_type3 = t_type3, mc_cores = 3)
@@ -201,5 +202,6 @@ for(mn in 1:nn){
   theta_hat_solve_hessian_embed[mn, 8] = theta_hat_hessian_solved_embed[8, 8]
   theta_hat_solve_hessian_embed[mn, 9] = theta_hat_hessian_solved_embed[9, 9]
   theta_hat_solve_hessian_embed[mn, 10] = theta_hat_hessian_solved_embed[10, 10]
+  theta_hat_solve_hessian_embed[mn, 11] = theta_hat_hessian_solved_embed[11, 11]
   
 }
