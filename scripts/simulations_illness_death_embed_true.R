@@ -6,7 +6,7 @@ library(parallel)
 nn = 100
 
 theta_hat_par_embed = matrix(NA, nrow = nn, ncol = 10)
-theta_hat_solve_hessian = matrix(NA, nrow = nn, ncol = 10)
+theta_hat_solve_hessian_embed = matrix(NA, nrow = nn, ncol = 10)
 
 theta_hat_par_comp= matrix(NA, nrow = nn, ncol = 9)
 theta_hat_solve_hessian_comp = matrix(NA, nrow = nn, ncol = 9)
